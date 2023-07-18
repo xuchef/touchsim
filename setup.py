@@ -5,14 +5,14 @@ setup(name='touchsim',
       description='TouchSim: Simulating tactile signals from the whole hand with millisecond precision',
       url='https://github.com/hsaal/touchsim',
       classifiers=[
-        'Development Status :: 3 - Alpha',
-        'Programming Language :: Python :: 3.6',
+          'Development Status :: 3 - Alpha',
+          'Programming Language :: Python :: 3.6',
       ],
       author='Hannes Saal',
       author_email='h.saal@sheffield.ac.uk',
       packages=['touchsim'],
       install_requires=[
-          'numpy','scipy','numba','matplotlib','holoviews','scikit-image'
+          'numpy', 'scipy', 'numba', 'matplotlib', 'holoviews', 'scikit-image'
       ],
       zip_safe=False,
-      data_files=[('surfaces',['surfaces/hand.png'])])
+      data_files=[('surfaces', ['surfaces/hand.png'])])
