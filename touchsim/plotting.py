@@ -70,7 +70,7 @@ def plot_afferent_population(obj, **args):
         points[a] = p.opts(
             aspect='equal',
             color=tuple(Afferent.affcol[a]),
-            size=size
+            s=size
         )
     return hv.NdOverlay(points)
 
@@ -120,7 +120,7 @@ def plot_stimulus(obj, **args):
                               'z':d[l, t]} for l in range(obj.location.shape[0])], vdims='z').options(
                 color=hv.dim('z'),
                 aspect='equal',
-                line_width=0.01,
+                linewidth=0.01,
                 cmap='fire')
             hm[t] = p
         hvobj = hv.HoloMap(hm, kdims='Time bin [' + str(bin) + ' ms]')
@@ -160,14 +160,11 @@ def plot_response(obj, **args):
                      r[idx, t:t+1]], axis=1), vdims=['Firing rate'])
                 if scale:
                     points[a] = p.options(color=tuple(Afferent.affcol[a]),
-                                          #   size_index=2,
-                                          #   scaling_factor=scaling_factor,
-
                                           # based on deprecated scaling_factor equation
-                                          size=np.sqrt(hv.dim('Firing rate') * 2 * np.pi) * scaling_factor,
+                                          s=(hv.dim('Firing rate') * 2 * np.pi) * scaling_factor,
                                           aspect='equal')
                 else:
-                    points[a] = p.options(color_index=2,
+                    points[a] = p.options(color=hv.dim("Firing rate"),
                                           aspect='equal',
                                           cmap='fire_r')
             hm[t] = hv.NdOverlay(points)
@@ -192,9 +189,7 @@ def plot_surface(obj, **args):
         color='k',
         yaxis=None,
         xaxis=None,
-        aspect='equal',
-        width=int(ceil(wh[0])),
-        height=int(ceil(wh[1]))
+        aspect='equal'
     )
 
     if fill is not None:

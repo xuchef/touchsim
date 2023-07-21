@@ -1,10 +1,16 @@
 name: ts
-
+channels:
+  - conda-forge
+  - defaults
 dependencies:
-  - python>=3.6
-  - numpy>=1.13
+  - numpy
+  - holoviews
+  - pytest
+  - python=3.11.4
   - scipy
+  - ipykernel
   - scikit-image
-  - numba>=0.34
-  - matplotlib>=2.2.2
-  - holoviews>=1.8.1
+  - numba
+  - selenium
+  - python-chromedriver-binary
+  - ipympl
