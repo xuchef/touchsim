@@ -22,16 +22,17 @@ class DisplacementMap:
         self.interpolator = RegularGridInterpolator([np.arange(i) for i in self.bitmap.shape], self.bitmap,
                                                     bounds_error=False, fill_value=None, method="cubic")
 
-    def height_at(self, x: float, y: float) -> float:
-        return self.interpolator((x, y))
+    def height_at(self, coord: tuple[float, float]) -> float:
+        return self.interpolator(coord)
 
-    def visualize(self, coords: tuple[float, float] = None,
+    def visualize(self, coords: np.ndarray[tuple[float, float]] = None,
                   show_original_points=False, surface_type: Literal["square", "triangular", "mesh"] = "triangular",
                   full_screen=False, hide_axis=True, resolution=100) -> None:
         fig = plt.figure(figsize=(8, 8))
         plt.subplots_adjust(bottom=0, left=0, right=1, top=1)
         ax = fig.add_subplot(projection="3d", computed_zorder=False)  # WHAT THE HECK MATPLOTLIB!!!!
-        ax.set_zmargin((255 - self.max_height) / self.max_height / 2)
+        # ax.set_zmargin((255 - self.max_height) / self.max_height / 2)
+        ax.set_zmargin(5*self.max_height)
 
         if hide_axis:
             ax.dist = 8
@@ -45,20 +46,23 @@ class DisplacementMap:
         X, Y = np.meshgrid(xx, yy, indexing="xy")
 
         if surface_type == "mesh":
-            ax.plot_wireframe(X, Y, self.height_at(X, Y), alpha=0.4, cmap="viridis")
+            ax.plot_wireframe(X, Y, self.height_at((X, Y)), alpha=0.4, cmap="viridis")
         if surface_type == "square":
-            ax.plot_surface(X, Y, self.height_at(X, Y), alpha=0.8, cmap="viridis", edgecolor="none")
+            ax.plot_surface(X, Y, self.height_at((X, Y)), alpha=0.8, cmap="viridis", edgecolor="none")
         if surface_type == "triangular":
-            ax.plot_trisurf(X.ravel(), Y.ravel(), self.height_at(X, Y).ravel(),
-                            cmap="viridis", edgecolor="none")
+            ax.plot_trisurf(X.ravel(), Y.ravel(), self.height_at((X, Y)).ravel(), cmap="viridis", edgecolor="none")
 
         if coords is not None:
-            ax.scatter(*coords, self.height_at(*coords), c="fuchsia", marker=7, s=100, zorder=3)
+            ax.scatter(coords[:, 0], coords[:, 1], self.height_at(coords), c="fuchsia", marker=".", s=100, zorder=3)
 
         if full_screen:
             plt.get_current_fig_manager().full_screen_toggle()
 
         plt.show()
+
+    @property
+    def shape(self):
+        return self.bitmap.shape
 
     def _get_bitmap(self, filename, size, max_height) -> np.ndarray[float]:
         image = Image.open(filename)
@@ -80,5 +84,6 @@ class DisplacementMap:
 
 
 if __name__ == "__main__":
-    texture = DisplacementMap("../textures/rock.jpg")
-    texture.visualize((50, 150))
+    texture = DisplacementMap("../textures/rock.jpg", max_height=10)
+    texture.visualize(np.array([(50, 150)]),  hide_axis=False)
+    # print(texture.shape)

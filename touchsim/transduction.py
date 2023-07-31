@@ -86,7 +86,7 @@ def block_solve(S0, D):
         add = nz.shape[1] % 64
         if add > 0:
             nz_ext = np.concatenate((nz,
-                                     np.zeros((nz.shape[0], 64-add), dtype=np.bool)), axis=1)
+                                     np.zeros((nz.shape[0], 64-add), dtype=bool)), axis=1)
         packed = np.packbits(nz_ext, axis=1).view(np.uint64)
 
     # find similar lines to solve the linear system

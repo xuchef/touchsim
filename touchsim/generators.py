@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import signal
 import random
+from matplotlib.path import Path
 
 from .classes import Afferent, AfferentPopulation, Stimulus
 from .surface import Surface, hand_surface
@@ -362,6 +363,44 @@ def stim_indent_shape(shape, trace, **args):
     return Stimulus(trace=t, location=shape[:, 0:2], **args)
 
 
+def get_finger_heights(pins):
+    """
+    x: (0, 3)
+    y: (-0.75, 0.75)
+    """
+    x, y = pins.T
+    x = np.interp(x, (min(x), max(x)), (0, 3))
+    y = np.interp(y, (min(y), max(y)), (-0.75, 0.75))
+    return np.exp(-2 * x) + (-np.sqrt(1 - np.power(y, 2) * 16/9) + 1)
+
+
+def stim_texture_indextip(disp_map, coords, pins, center):
+    pins = pins[:, :2]
+    finger_heights = get_finger_heights(pins)
+
+    texture_heights = disp_map.height_at(coords + pins[:, np.newaxis, :])
+    origin_heights = disp_map.height_at(coords + center)
+    trace = texture_heights - origin_heights - finger_heights[:, np.newaxis]
+    trace[trace < 0] = 0
+    # print("texture_heights:", texture_heights.shape)
+    # print("origin_heights:", origin_heights.shape)
+    # print("finger_heights:", finger_heights.shape)
+    # print(trace.shape)
+
+    # trace = []
+    # for loc_xy in locs:
+    #     i = []
+    #     origin_height = disp_map.height_at(loc_xy)
+    #     for pin_xyz in pins:
+    #         coord_xy = loc_xy + pin_xyz[:2]
+    #         h = disp_map.height_at(coord_xy) - origin_height - pin_xyz[2]
+    #         i.append(h)
+    #     trace.append(i)
+    # return trace
+
+    return Stimulus(trace=trace, location=pins)
+
+
 def shape_bar(**args):
     """Generates pin locations for a bar shape.
 
@@ -381,6 +420,8 @@ def shape_bar(**args):
     angle = np.deg2rad(args.get('angle', 0.))
     pins_per_mm = args.get('pins_per_mm', default_params['pins_per_mm'])
 
+    # COOL COMPLEX NUMBER STUFF:
+    # if it is complex, then the step is autocomputed where magnitude = # of vals
     xy = np.mgrid[-width/2.:width/2.:width*pins_per_mm*1j,
                   -height/2.:height/2.:height*pins_per_mm*1j]
     xy = xy.reshape(2, xy.shape[1]*xy.shape[2]).T
@@ -427,6 +468,66 @@ def shape_circle(**args):
         xy = xy + np.array(args.get('center'))
     xy = np.hstack((xy, d))
     return xy
+
+
+def shape_hand_region(**args):
+    """Generates pin locations for D2d_t (the tip of the index finger).
+
+    Kwargs:
+        region (str): identifies region(s) to populate, with None selecting
+            all regions (default: None), e.g.
+            'D2' for a full finger (digit 2), or
+            'D2d' for a part (tip of digit 2).
+        pins_per_mm (int): Pins per mm (default: 10).
+
+    Returns:
+        3D array of pin locations.
+    """
+    surface = hand_surface
+
+    region = args.pop('region', None)
+    pins_per_mm = args.get('pins_per_mm', default_params['pins_per_mm'])
+
+    idx = surface.tag2idx(region)
+
+    # import matplotlib.pyplot as plt
+    # fig, ax = plt.subplots()
+
+    res = None
+    for i in idx:
+        boundary = surface.pixel2hand(surface.boundary[i])
+        path = Path(boundary)
+        # ax.scatter(boundary[:, 0], boundary[:, 1])
+
+        imin = np.min(boundary, axis=0)
+        imax = np.max(boundary, axis=0)
+        width, height = imax - imin
+
+        xy = np.mgrid[imin[0]:imax[0]:width*pins_per_mm*1j,
+                      imin[1]:imax[1]:height*pins_per_mm*1j]
+        xy = xy.reshape(2, xy.shape[1]*xy.shape[2]).T
+        xy = xy[path.contains_points(xy)]
+
+        d = np.zeros((xy.shape[0], 1))
+        xy = np.hstack((xy, d))
+
+        res = xy if res is None else np.vstack((res, xy))
+
+    return res
+
+
+def shape_bitmap(**args):
+    """Generates pin locations for an arbitrary shape whose border
+    is defined by a bitmap.
+
+    Kwargs:
+        bitmap (2D np array): Bitmap defining the border of the shape.
+        pins_per_mm (int): Pins per mm (default: 10).
+
+    Returns:
+        3D array of pin locations.
+    """
+    bitmap = args.get('bitmap', hand_surface)
 
 
 def apply_ramp(trace, **args):

@@ -121,7 +121,7 @@ def plot_stimulus(obj, **args):
                 color=hv.dim('z'),
                 aspect='equal',
                 linewidth=0.01,
-                cmap='fire')
+                cmap='fire', colorbar=True)
             hm[t] = p
         hvobj = hv.HoloMap(hm, kdims='Time bin [' + str(bin) + ' ms]')
     return hvobj
@@ -204,8 +204,8 @@ def plot_surface(obj, **args):
         im = np.nan*np.zeros(tuple((imax-imin+1)[::-1].tolist()))
         for i in idx:
             im[obj._coords[i][:, 1]-imin[1], obj._coords[i][:, 0]-imin[0]] = vals[i]
-        hvobj = hv.Image(np.flipud(im), bounds=(imin[0], imin[1], imax[0], imax[1])).opts(
-            plot=dict(yaxis=None, xaxis=None))
+        hvobj = hv.Image(np.flipud(im), bounds=(imin[0], imin[1], imax[0], imax[1])).options(
+            yaxis=None, xaxis=None)
 
     if coord is not None:
         hvobj *= hv.Curve([obj.hand2pixel((0, 0)), obj.hand2pixel((coord, 0))]) *\
