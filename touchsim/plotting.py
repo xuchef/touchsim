@@ -3,9 +3,11 @@ import re
 import numpy as np
 import warnings
 from math import ceil
+import matplotlib.pyplot as plt
 
 from .classes import Afferent,AfferentPopulation,Stimulus,Response
 from .surface import Surface,hand_surface
+from .texture import Texture
 
 def plot(obj=hand_surface,**args):
     """A visual representation of an AfferentPopulation, a Stimulus, a Response,
@@ -43,6 +45,17 @@ def plot(obj=hand_surface,**args):
         scaling_factor = Sets response scaling factor, only meaningful, if scale=True
             (default: 2)
         bin = Width of time bins in ms, used when generating animations (default: Inf).
+
+    Kwargs for Texture:
+        locs (array): An array of points that define a path to plot (default: None).
+        show_control_points (bool): Display the locations of the control points tha
+            define the interpolated texture map (default: False).
+        surface_type (string): Type of plot to generate. One of 'triangular', 'square',
+            or 'mesh' (default: 'triangular').
+        fullscreen (bool): Display the plot in fullscreen mode (default: False).
+        hide_axis (bool): Hide the plot axes (default: True).
+        resolution (int): Number of points along each axis to sample the texture at
+            for plotting (default: 100).
     """
 
     with warnings.catch_warnings():
@@ -57,6 +70,8 @@ def plot(obj=hand_surface,**args):
             return plot_response(obj,**args)
         elif type(obj) is Surface:
             return plot_surface(obj,**args)
+        elif type(obj) is Texture:
+            return plot_texture(obj,**args)
     raise RuntimeError("Plotting of " + str(type(obj)) + " objects not supported.")
 
 def plot_afferent_population(obj,**args):
@@ -208,6 +223,52 @@ def plot_surface(obj,**args):
         return dm
 
     return hvobj
+
+def plot_texture(obj,**args):
+    locs = args.get('locs',None)
+    show_control_points = args.get('show_control_points',False)
+    surface_type = args.get('surface_type','triangular')
+    fullscreen = args.get('fullscreen',False)
+    hide_axis = args.get('hide_axis',True)
+    resolution = args.get('resolution',100)
+
+    fig = plt.figure(figsize=(8, 8))
+    plt.subplots_adjust(bottom=0,left=0,right=1,top=1)
+    ax = fig.add_subplot(projection="3d",computed_zorder=False)
+    ax.set_zmargin(5*obj.max_height)
+    ax.set_box_aspect((1,obj.shape[1]/obj.shape[0],1))
+
+    if hide_axis:
+        ax.dist = 8
+        ax.axis("off")
+
+    if show_control_points:
+        x, y = np.meshgrid(np.arange(obj.shape[0]),np.arange(obj.shape[1]))
+        ax.scatter(x.ravel(),y.ravel(),obj.bitmap.ravel(),
+            s=10,c='k')
+
+    xx = np.linspace(0,obj.shape[0],resolution)
+    yy = np.linspace(0,obj.shape[1],resolution)
+    X, Y = np.meshgrid(xx,yy,indexing="xy")
+
+    if surface_type == "mesh":
+        ax.plot_wireframe(X,Y,obj.height_at((X, Y)),
+            alpha=0.4,cmap="viridis")
+    if surface_type == "square":
+        ax.plot_surface(X,Y,obj.height_at((X, Y)),
+            alpha=0.8,cmap="viridis",edgecolor="none")
+    if surface_type == "triangular":
+        ax.plot_trisurf(X.ravel(),Y.ravel(),obj.height_at((X, Y)).ravel(),
+            cmap="viridis",edgecolor="none")
+
+    if locs is not None:
+        ax.scatter(locs[:,0],locs[:,1],obj.height_at(locs),
+            c="fuchsia",marker=".",s=100,zorder=3)
+
+    if fullscreen:
+        plt.get_current_fig_manager().full_screen_toggle()
+
+    plt.show()
 
 def figsave(hvobj,filename,**args):
     """Saves a plot to an image file.
