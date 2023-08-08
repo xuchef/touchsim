@@ -7,13 +7,12 @@ import touchsim as ts
 import json
 from touchsim.plotting import plot
 
-RESULTS_FOLDER = 'results'
 
 def save_obj(obj, path):
     with open(path, 'wb') as f:
         pickle.dump(obj, f)
 
-def child_process(a, process_name, tasks):
+def child_process(a, results_folder, process_name, tasks):
     for task in tasks:
         texture = ts.Texture(filename=task['file_path'], size=task['bounds'], max_height=1)  # keep max_height at 1
         
@@ -24,9 +23,9 @@ def child_process(a, process_name, tasks):
 
         r = a.response(s)
 
-        save_obj(r, os.path.join(RESULTS_FOLDER, 'responses', task['id']+'.pkl'))
-        save_obj(texture, os.path.join(RESULTS_FOLDER, 'textures', task['id']+'.pkl'))
-        save_obj(s, os.path.join(RESULTS_FOLDER, 'stimuli', task['id']+'.pkl'))
+        save_obj(r, os.path.join(results_folder, 'responses', task['id']+'.pkl'))
+        save_obj(texture, os.path.join(results_folder, 'textures', task['id']+'.pkl'))
+        save_obj(s, os.path.join(results_folder, 'stimuli', task['id']+'.pkl'))
 
         print(task['file_path'], r, sep="\n")
 
@@ -58,8 +57,8 @@ def generate_path(x_upperbound, y_upperbound, distance, sample_count):
         points.append((x_samples[i], y_samples[i]))
     return points
 
-def get_afferent_pop():
-    aff_pop_file_path = os.path.join(RESULTS_FOLDER, 'afferent_pop.pkl')
+def get_afferent_pop(results_folder):
+    aff_pop_file_path = os.path.join(results_folder, 'afferent_pop.pkl')
     if os.path.exists(aff_pop_file_path):
         with open(aff_pop_file_path, "rb") as f:
             a = pickle.load(f)
@@ -72,7 +71,11 @@ def get_afferent_pop():
 
 
 def main(args):
-    a = get_afferent_pop()
+    os.makedirs(args.results_folder, exist_ok=True)
+    os.makedirs(os.path.join(args.results_folder, 'responses'), exist_ok=True)
+    os.makedirs(os.path.join(args.results_folder, 'textures'), exist_ok=True)
+    os.makedirs(os.path.join(args.results_folder, 'stimuli'), exist_ok=True)
+    a = get_afferent_pop(args.results_folder)
     path_list = []
     contents = os.listdir(args.texture_file_directory)
     contents = contents[:args.texture_count]
@@ -95,7 +98,7 @@ def main(args):
             data_dict['id'] = f"{i}_{file}" 
             path_list.append(data_dict)
 
-    with open(os.path.join(RESULTS_FOLDER, "info.json"), "w") as f:
+    with open(os.path.join(args.results_folder, "info.json"), "w") as f:
         json.dump(path_list, f)
     args.num_child_threads = min(len(path_list), args.num_child_threads)
     items_per_child, remainder = divmod(len(path_list), args.num_child_threads)
@@ -107,7 +110,7 @@ def main(args):
     process_names = [f'P{i}' for i in range(args.num_child_threads)]
     processes = []
     for i in range(len(process_names)):
-        process = multiprocessing.Process(target=child_process, args=(a, process_names[i], split_list[i]))
+        process = multiprocessing.Process(target=child_process, args=(a, args.results_folder, process_names[i], split_list[i]))
         processes.append(process)
         process.start()
 
@@ -117,16 +120,12 @@ def main(args):
 
 
 if __name__ == "__main__":
-    os.makedirs(RESULTS_FOLDER, exist_ok=True)
-    os.makedirs(os.path.join(RESULTS_FOLDER, 'responses'), exist_ok=True)
-    os.makedirs(os.path.join(RESULTS_FOLDER, 'textures'), exist_ok=True)
-    os.makedirs(os.path.join(RESULTS_FOLDER, 'stimuli'), exist_ok=True)
-
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Script for generating sample coordinates along a path of specified length")
 
     # Add arguments to the parser
     parser.add_argument("--texture_file_directory", type=str, help="Directory to get textures from")
+    parser.add_argument("--results_folder", type=str, help="Directory to store results")
     parser.add_argument("--num_child_threads", default=os.cpu_count(), type=int, help="Number of processes to run")
     parser.add_argument("--texture_count", type=int, help="The number of textures to sample data from")
     parser.add_argument("--stimulus_duration", type=float, help="The duration for which each stimulus persists")

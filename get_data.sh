@@ -1,5 +1,6 @@
 python data_generation.py \
        --texture_file_directory './classification_textures' \
+       --results_folder './results' \
        --num_child_threads 2 \
        --texture_count 2 \
        --stimulus_duration 2 \
