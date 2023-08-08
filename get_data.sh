@@ -1,0 +1,13 @@
+python data_generation.py \
+       --texture_file_directory './classification_textures' \
+       --num_child_threads 2 \
+       --texture_count 2 \
+       --stimulus_duration 2 \
+       --sample_frequency 1000 \
+       --samples_per_texture 1 \
+       --x_upperbound 60 \
+       --y_upperbound 60 \
+       --distance 50 \
+       --pins_per_mm 1 \
+       --depth 0.1 \
+       --theta 0
