@@ -247,8 +247,8 @@ def plot_texture(obj,**args):
         ax.scatter(x.ravel(),y.ravel(),obj.bitmap.ravel(),
             s=10,c='k')
 
-    xx = np.linspace(0,obj.shape[0],resolution)
-    yy = np.linspace(0,obj.shape[1],resolution)
+    xx = np.linspace(0,obj.shape[0],resolution,endpoint=False)
+    yy = np.linspace(0,obj.shape[1],resolution,endpoint=False)
     X, Y = np.meshgrid(xx,yy,indexing="xy")
 
     if surface_type == "mesh":
