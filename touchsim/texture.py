@@ -34,7 +34,7 @@ class Texture(object):
             values=self.bitmap,
             method="cubic",
             bounds_error=False,
-            fill_value=np.nan) # TODO: check that this doesn't break the rest of the code!
+            fill_value=0)
         
 
     @property
