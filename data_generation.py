@@ -97,6 +97,7 @@ def main(args):
 
     with open(os.path.join(RESULTS_FOLDER, "info.json"), "w") as f:
         json.dump(path_list, f)
+    args.num_child_threads = min(len(path_list), args.num_child_threads)
     items_per_child, remainder = divmod(len(path_list), args.num_child_threads)
     split_list = [path_list[i: i + items_per_child] 
                   for i in range(0, len(path_list), items_per_child)]
