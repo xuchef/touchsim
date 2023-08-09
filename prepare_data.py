@@ -9,56 +9,32 @@ import argparse
 import shutil
 from PIL import Image
 
-# args.results_folder = "results_classification_1ppm_3"
-# args.bin_size = 5
-# args.percent_training = 80
-# args.min_spikes_threshold = 1
-
 
 def extract_category(string):
     return string.split("_", maxsplit=1)[1][:-4]
 
 
 def main(args):
-    if os.path.exists(os.path.join(args.results_folder, "response_dict.pkl")):
-        with open(os.path.join(args.results_folder, "response_dict.pkl"), "rb") as f:
-            response_dict = pickle.load(f)
-    else:
-        response_dict = {}
-        for file in os.listdir(os.path.join(args.results_folder, "responses")):
-            with open(os.path.join(args.results_folder, "responses", file), "rb") as f:
-                r = pickle.load(f)
-            response_dict[file] = r
-        with open(os.path.join(args.results_folder, "response_dict.pkl"), "wb") as f:
-            pickle.dump(response_dict,f)
-
-    if args.aff_class:
-        response_dict = {key: r[r.aff[args.aff_class]] for key, r in response_dict.items()}
-
     idx = set()
-    for r in response_dict.values():
-        idx |= set([i for i in range(len(r.spikes)) if len(r.spikes[i]) >= args.min_spikes_threshold])
-    idx = np.array(list(idx))
-    print("Num afferents:", len(idx))
-
-    # lens = [np.count_nonzero([arr.size > args.min_spikes_threshold for arr in r.spikes]) for r in response_dict.values()]
-    # np.median(lens)
-
     max_val = 0
-    for r in response_dict.values():
+    category_counts = {}
+    for file in os.listdir(os.path.join(args.results_folder, "responses")):
+        with open(os.path.join(args.results_folder, "responses", file), "rb") as f:
+            r = pickle.load(f)
+
+        if args.aff_class:
+            r =  r[r.aff[args.aff_class]]
+
+        idx |= set([i for i in range(len(r.spikes)) if len(r.spikes[i]) >= args.min_spikes_threshold])
         max_val = max(max_val, np.max(r.psth(args.bin_size)))
+
+        category = extract_category(file)
+        category_counts[category] = 1 if category not in category_counts else category_counts[category] + 1
+
+    idx = np.array(list(idx))
+
+    print("Num afferents:", len(idx))
     print("Max val:", max_val)
-
-
-    categorized_responses = {}
-    for key, value in response_dict.items():
-        category = extract_category(key)
-        if category not in categorized_responses:
-            categorized_responses[category] = []
-        categorized_responses[category].append(value)
-
-    for val in categorized_responses.values():
-        np.random.shuffle(val)
 
     training_folder_name = f"training_data_{args.aff_class}" if args.aff_class else "training_data"
     validation_folder_name = f"validation_data_{args.aff_class}" if args.aff_class else "validation_data"
@@ -72,23 +48,34 @@ def main(args):
     os.makedirs(training_folder_path, exist_ok=True)
     os.makedirs(validation_folder_path, exist_ok=True)
 
-    for category, responses in categorized_responses.items():
+    category_counts_cur = {}
+    for file in os.listdir(os.path.join(args.results_folder, "responses")):
+        category = extract_category(file)
+        category_counts_cur[category] = 1 if category not in category_counts_cur else category_counts_cur[category] + 1
+
+        with open(os.path.join(args.results_folder, "responses", file), "rb") as f:
+            r = pickle.load(f)
+
+        if args.aff_class:
+            r =  r[r.aff[args.aff_class]]
+
         os.makedirs(os.path.join(training_folder_path, category), exist_ok=True)
         os.makedirs(os.path.join(validation_folder_path, category), exist_ok=True)
 
-        for i, r in enumerate(responses):
-            spike_histogram = r.psth(args.bin_size)
-            spike_histogram = spike_histogram[idx]
-            spike_histogram = np.interp(spike_histogram, (0, max_val), (0, 255))
-            image = Image.fromarray(spike_histogram.astype(np.uint8), mode='L')#.resize((200, 200))
-            directory = training_folder_name if (i+1) / len(responses) * 100 <= args.percent_training else validation_folder_name
-            image.save(os.path.join(args.results_folder, directory, category, f"{i}.jpg"))
+        spike_histogram = r.psth(args.bin_size)
+        spike_histogram = spike_histogram[idx]
+        spike_histogram = np.interp(spike_histogram, (0, max_val), (0, 255))
+        image = Image.fromarray(spike_histogram.astype(np.uint8), mode='L')
+        directory = training_folder_name if (category_counts_cur[category]) / category_counts[category] * 100 <= args.percent_training else validation_folder_name
+        image.save(os.path.join(args.results_folder, directory, category, f"{category_counts_cur[category]}.jpg"))
+
+    print(category_counts)
 
     with open(os.path.join(args.results_folder, info_file_name), "w") as f:
         json.dump({
             "width": image.size[0],
             "height": image.size[1],
-            "num_classes": len(categorized_responses)
+            "num_classes": len(category_counts)
         }, f)
 
 
