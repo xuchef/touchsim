@@ -18,7 +18,10 @@ def main(args):
     idx = set()
     max_val = 0
     category_counts = {}
-    for file in os.listdir(os.path.join(args.results_folder, "responses")):
+    print("Get population data")
+    responses = os.listdir(os.path.join(args.results_folder, "responses"))
+    for i, file in enumerate(responses):
+        print(i, "/", len(responses), end="\r")
         with open(os.path.join(args.results_folder, "responses", file), "rb") as f:
             r = pickle.load(f)
 
@@ -48,8 +51,10 @@ def main(args):
     os.makedirs(training_folder_path, exist_ok=True)
     os.makedirs(validation_folder_path, exist_ok=True)
 
+    print("Generate images")
     category_counts_cur = {}
-    for file in os.listdir(os.path.join(args.results_folder, "responses")):
+    for i, file in enumerate(responses):
+        print(i, "/", len(responses), end="\r")
         category = extract_category(file)
         category_counts_cur[category] = 1 if category not in category_counts_cur else category_counts_cur[category] + 1
 
