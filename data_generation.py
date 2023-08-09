@@ -12,9 +12,9 @@ def save_obj(obj, path):
     with open(path, 'wb') as f:
         pickle.dump(obj, f)
 
-def child_process(a, results_folder, process_name, tasks):
+def child_process(a, results_folder, process_name, tasks, total):
     for task in tasks:
-        texture = ts.Texture(filename=task['file_path'], size=task['bounds'], max_height=1)  # keep max_height at 1
+        texture = ts.Texture(filename=task['file_path'], size=task['bounds'], max_height=2)  # keep max_height at 1
         
         # plot(texture, locs=np.array(task['path_points']))
         pins = ts.shape_hand(region="D2d_t", pins_per_mm=task['pins_per_mm'])
@@ -27,7 +27,7 @@ def child_process(a, results_folder, process_name, tasks):
         save_obj(texture, os.path.join(results_folder, 'textures', task['id']+'.pkl'))
         save_obj(s, os.path.join(results_folder, 'stimuli', task['id']+'.pkl'))
 
-        print(task['file_path'], r, sep="\n")
+        print(f"{len(os.listdir(os.path.join(results_folder, 'responses')))} / {total}")
 
 def within_bounds(point, axis_bounds):
     x_within_bounds = (point[0] >= 0 and point[0] <= axis_bounds[0])
@@ -45,7 +45,7 @@ def generate_path(x_upperbound, y_upperbound, distance, sample_count):
     p2 = (p1[0] + distance * np.cos(theta), p1[1] + distance * np.sin(theta))
     if p2[0] < 0 or p2[0] >= axis_bounds[0] or p2[1] < 0 or p2[1] >= axis_bounds[1]:
         # Shift p2 to be within axis_bounds
-        buffer = np.random.uniform(0, min(axis_bounds) - distance)
+        buffer = np.random.uniform((min(axis_bounds) - distance) / 2, min(axis_bounds) - distance)
         p2 = (min(max(p2[0], 0), axis_bounds[0] - buffer), min(max(p2[1], 0), axis_bounds[1] - buffer))
         p1 = (p2[0] - distance * np.cos(theta), p2[1] - distance * np.sin(theta))
     # print(p1, p2, np.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2))
@@ -110,7 +110,7 @@ def main(args):
     process_names = [f'P{i}' for i in range(args.num_child_threads)]
     processes = []
     for i in range(len(process_names)):
-        process = multiprocessing.Process(target=child_process, args=(a, args.results_folder, process_names[i], split_list[i]))
+        process = multiprocessing.Process(target=child_process, args=(a, args.results_folder, process_names[i], split_list[i], len(path_list)))
         processes.append(process)
         process.start()
 
