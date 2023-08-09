@@ -26,3 +26,4 @@ tests/.cache/*
 scratch*.ipynb
 *.jpg
 results
+*.pkl
