@@ -17,10 +17,6 @@ def main(args):
     with open(os.path.join(args.results_folder, info_file_name)) as f:
         training_info = json.load(f)
 
-    # training parameters
-    args.epochs = 50
-    args.batch_size = 2
-
     # Define image dimensions and categories
     img_width = training_info["width"]
     img_height = training_info["height"]
