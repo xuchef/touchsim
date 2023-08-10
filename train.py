@@ -12,7 +12,7 @@ def main(args):
     training_folder_name = f"training_data_{args.aff_class}" if args.aff_class else "training_data"
     validation_folder_name = f"validation_data_{args.aff_class}" if args.aff_class else "validation_data"
     info_file_name = f"training_info_{args.aff_class}" if args.aff_class else "training_info" 
-    model_weights_file_name = f"model_weights_{args.aff_class}.h5" if args.aff_class else "model_weights"
+    model_weights_file_name = f"model_weights_{args.aff_class}_{args.batch_size}.h5" if args.aff_class else f"model_weights_{args.batch_size}"
 
     with open(os.path.join(args.results_folder, info_file_name)) as f:
         training_info = json.load(f)
