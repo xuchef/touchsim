@@ -5,14 +5,17 @@ import argparse
 from tensorflow.keras.models import load_model
 
 def main(args):
+    training_folder_name = f"training_data_{args.aff_class}" if args.aff_class else "training_data"
+    validation_folder_name = f"validation_data_{args.aff_class}" if args.aff_class else "validation_data"
     model_weights_file_name = f"model_weights_{args.aff_class}_{args.batch_size}.h5" if args.aff_class else f"model_weights_{args.batch_size}"
+
     model = load_model(os.path.join(args.results_folder, model_weights_file_name))
+
     num_correct = 0
     total = 0
-
-    for i, category in enumerate(os.listdir(os.path.join(args.results_folder, "validation_data"))):
-        for file in os.listdir(os.path.join(args.results_folder, "validation_data", category)):
-            test_image_path = os.path.join(args.results_folder, "validation_data", category, file)
+    for i, category in enumerate(os.listdir(os.path.join(args.results_folder, validation_folder_name))):
+        for file in os.listdir(os.path.join(args.results_folder, validation_folder_name, category)):
+            test_image_path = os.path.join(args.results_folder, validation_folder_name, category, file)
             test_image = np.expand_dims(np.array(Image.open(test_image_path).convert("L")), axis=0)
 
             predictions = model.predict(test_image, verbose=0)
