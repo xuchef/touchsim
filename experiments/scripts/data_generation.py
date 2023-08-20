@@ -120,23 +120,25 @@ def main(args):
 
 
 if __name__ == "__main__":
+    os.chdir(os.path.join(".."))
+
     # Create an argument parser
     parser = argparse.ArgumentParser(description="Script for generating sample coordinates along a path of specified length")
 
     # Add arguments to the parser
-    parser.add_argument("--texture_file_directory", type=str, help="Directory to get textures from")
-    parser.add_argument("--results_folder", type=str, help="Directory to store results")
-    parser.add_argument("--num_child_threads", default=os.cpu_count(), type=int, help="Number of processes to run")
-    parser.add_argument("--texture_count", type=int, help="The number of textures to sample data from")
-    parser.add_argument("--stimulus_duration", type=float, help="The duration for which each stimulus persists")
-    parser.add_argument("--sample_frequency", type=float, help="The sampling rate for stimuli (in Hz)")
-    parser.add_argument("--samples_per_texture", type=int, help="The number of samples to be generated for each texture")
-    parser.add_argument("--x_upperbound", type=int, help="Upper bound for the maximum x coordinate")
-    parser.add_argument("--y_upperbound", type=int, help="Upper bound for the maximum y coordinate")
-    parser.add_argument("--distance", type=float, help="Required length of line")
-    parser.add_argument("--pins_per_mm", type=float, help="Stimulus pin density")
-    parser.add_argument("--depth", type=float, help="Indentation depth")
-    parser.add_argument("--theta", type=float, help="Rotation of finger")
+    parser.add_argument("--texture_file_directory", type=str, help="Directory to get textures from", required=True)
+    parser.add_argument("--results_folder", type=str, help="Directory to store results", required=True)
+    parser.add_argument("--num_child_threads", default=os.cpu_count(), type=int, help="Number of processes to run", required=True)
+    parser.add_argument("--texture_count", type=int, help="The number of textures to sample data from", required=True)
+    parser.add_argument("--stimulus_duration", type=float, help="The duration for which each stimulus persists", required=True)
+    parser.add_argument("--sample_frequency", type=float, help="The sampling rate for stimuli (in Hz)", required=True)
+    parser.add_argument("--samples_per_texture", type=int, help="The number of samples to be generated for each texture", required=True)
+    parser.add_argument("--x_upperbound", type=int, help="Upper bound for the maximum x coordinate", required=True)
+    parser.add_argument("--y_upperbound", type=int, help="Upper bound for the maximum y coordinate", required=True)
+    parser.add_argument("--distance", type=float, help="Required length of line", required=True)
+    parser.add_argument("--pins_per_mm", type=float, help="Stimulus pin density", required=True)
+    parser.add_argument("--depth", type=float, help="Indentation depth", required=True)
+    parser.add_argument("--theta", type=float, help="Rotation of finger", required=True)
 
     # Parse the command-line arguments
     args = parser.parse_args()

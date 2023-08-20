@@ -13,9 +13,9 @@ def main(args):
 
     num_correct = 0
     total = 0
-    for i, category in enumerate(os.listdir(os.path.join(args.results_folder, validation_folder_name))):
-        for file in os.listdir(os.path.join(args.results_folder, validation_folder_name, category)):
-            test_image_path = os.path.join(args.results_folder, validation_folder_name, category, file)
+    for i, category in enumerate(os.listdir(os.path.join(args.results_folder, training_folder_name))):
+        for file in os.listdir(os.path.join(args.results_folder, training_folder_name, category)):
+            test_image_path = os.path.join(args.results_folder, training_folder_name, category, file)
             test_image = np.expand_dims(np.array(Image.open(test_image_path).convert("L")), axis=0)
 
             predictions = model.predict(test_image, verbose=0)

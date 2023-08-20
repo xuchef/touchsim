@@ -27,3 +27,5 @@ scratch*.ipynb
 *.jpg
 results
 *.pkl
+experiments/datasets
+experiments/texture_sets
