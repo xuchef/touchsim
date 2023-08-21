@@ -1,148 +1,153 @@
 import os
-import multiprocessing
+from  multiprocessing import Process
 import argparse
 import numpy as np
-import pickle
 import touchsim as ts
-import json
-from touchsim.plotting import plot
+from .helper import *
 
 
-def save_obj(obj, path):
-    with open(path, 'wb') as f:
-        pickle.dump(obj, f)
-
-def child_process(a, results_folder, process_name, tasks, total):
+def child_process(affpop, path_util, tasks, num_total_tasks):
+    """Process to run a subset of tasks. Note that all arguments should be read-only.
+    """
     for task in tasks:
-        texture = ts.Texture(filename=task['file_path'], size=task['bounds'], max_height=2)  # keep max_height at 1
-        
-        # plot(texture, locs=np.array(task['path_points']))
-        pins = ts.shape_hand(region="D2d_t", pins_per_mm=task['pins_per_mm'])
-        s = ts.stim_texture_indextip(texture, np.array(task['path_points']), pins, 
-            depth=task['depth'], theta=task['theta'], fs=task['sample_frequency'])
+        texture = ts.Texture(filename=task["filename"], 
+                             size=(task["x_upperbound"], task["y_upperbound"]), 
+                             max_height=2)
+        pins = ts.shape_hand(region="D2d_t", pins_per_mm=task["pins_per_mm"])
+        stimulus = ts.stim_texture_indextip(texture, np.array(task["path_points"]), pins,
+                                            depth=task["depth"], theta=task["theta"], 
+                                            fs=task["sample_frequency"])
+        response = affpop.response(stimulus)
 
-        r = a.response(s)
+        save_pkl(response, os.path.join(path_util.responses_dir, task["id"]))
+        save_pkl(texture, os.path.join(path_util.textures_dir, task["id"]))
+        save_pkl(stimulus, os.path.join(path_util.stimuli_dir, task["id"]))
 
-        save_obj(r, os.path.join(results_folder, 'responses', task['id']+'.pkl'))
-        save_obj(texture, os.path.join(results_folder, 'textures', task['id']+'.pkl'))
-        save_obj(s, os.path.join(results_folder, 'stimuli', task['id']+'.pkl'))
+        for aff_class, dir_path in path_util.aff_spikes_dirs.items():
+            if aff_class in ts.constants.affclasses:
+                spikes = response[response.aff[aff_class]].spikes
+            else:
+                spikes = response.spikes
+            save_pkl(spikes, os.path.join(dir_path, task["id"]))
 
-        print(f"{len(os.listdir(os.path.join(results_folder, 'responses')))} / {total}")
+        num_tasks_completed = len(os.listdir(path_util.responses_dir))
+        print(f"{num_tasks_completed} / {num_total_tasks}")
 
-def within_bounds(point, axis_bounds):
-    x_within_bounds = (point[0] >= 0 and point[0] <= axis_bounds[0])
-    y_within_bounds = (point[1] >= 0 and point[1] <= axis_bounds[1])
-    return (x_within_bounds and y_within_bounds)
 
 def generate_path(x_upperbound, y_upperbound, distance, sample_count):
-    axis_bounds = (x_upperbound, y_upperbound)
-    if (distance >= x_upperbound or distance >= y_upperbound):
-        print('Distance must be within axis bounds!')
+    """Let p1 be (0, 0) and p2 be [distance] away from p1 at a random angle on [0, PI/2].
+    Then move p1 and p2 to a random position within the specified bounds.
+    """
+    axis_bounds = np.array([x_upperbound, y_upperbound])
+
+    if (distance >= min(axis_bounds)):
+        print("Distance must be less than axis bounds!")
         exit(1)
     
-    p1 = (np.random.uniform(0, axis_bounds[0]), np.random.uniform(0, axis_bounds[1]))
-    theta = np.random.uniform(0, 2 * np.pi)
-    p2 = (p1[0] + distance * np.cos(theta), p1[1] + distance * np.sin(theta))
-    if p2[0] < 0 or p2[0] >= axis_bounds[0] or p2[1] < 0 or p2[1] >= axis_bounds[1]:
-        # Shift p2 to be within axis_bounds
-        buffer = np.random.uniform((min(axis_bounds) - distance) / 2, min(axis_bounds) - distance)
-        p2 = (min(max(p2[0], 0), axis_bounds[0] - buffer), min(max(p2[1], 0), axis_bounds[1] - buffer))
-        p1 = (p2[0] - distance * np.cos(theta), p2[1] - distance * np.sin(theta))
-    # print(p1, p2, np.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2))
-    # lastly, to sample sample_count points on this line
-    x_samples = np.linspace(p1[0], p2[0], sample_count)
-    y_samples = np.linspace(p1[1], p2[1], sample_count)
-    points = []
-    for i in range(sample_count):
-        points.append((x_samples[i], y_samples[i]))
-    return points
+    p1 = np.zeros(2)
+    theta = np.random.uniform(0, np.pi/2)
+    p2 = np.array([np.cos(theta), np.sin(theta)]) * distance
 
-def get_afferent_pop(results_folder):
-    aff_pop_file_path = os.path.join(results_folder, 'afferent_pop.pkl')
-    if os.path.exists(aff_pop_file_path):
-        with open(aff_pop_file_path, "rb") as f:
-            a = pickle.load(f)
-    else:
-        a = ts.affpop_hand(density_multiplier=1)
-        with open(aff_pop_file_path, "wb") as f:
-            pickle.dump(a, f)
-    return a
+    gap = axis_bounds - p2
+    offset = np.random.uniform(0, gap)
+    p1 += offset
+    p2 += offset
 
+    path_points = np.linspace(p1, p2, sample_count)
+
+    return path_points
 
 
 def main(args):
-    os.makedirs(args.results_folder, exist_ok=True)
-    os.makedirs(os.path.join(args.results_folder, 'responses'), exist_ok=True)
-    os.makedirs(os.path.join(args.results_folder, 'textures'), exist_ok=True)
-    os.makedirs(os.path.join(args.results_folder, 'stimuli'), exist_ok=True)
-    a = get_afferent_pop(args.results_folder)
-    path_list = []
-    contents = os.listdir(args.texture_file_directory)
-    contents = contents[:args.texture_count]
-    for i in range(args.samples_per_texture):
-        path_points = generate_path(args.x_upperbound, args.y_upperbound, args.distance, 
-                                    int(args.sample_frequency * args.stimulus_duration))
-        for file in contents:
-            data_dict = {}
-            file_path = os.path.join(args.texture_file_directory, file)
-            data_dict['file_path'] = file_path
-            data_dict['filename'] = file
-            data_dict['stimulus_duration'] = args.stimulus_duration
-            data_dict['sample_frequency'] = args.sample_frequency
-            data_dict['path_points'] = path_points
-            data_dict['index'] = i
-            data_dict['bounds'] = [args.x_upperbound, args.y_upperbound]
-            data_dict['pins_per_mm'] = args.pins_per_mm
-            data_dict['depth'] = args.depth
-            data_dict['theta'] = args.theta
-            data_dict['id'] = f"{i}_{file}" 
-            path_list.append(data_dict)
+    # Initialize PathUtil object for standardizing path names across scripts
+    path_util = PathUtil(args.texture_set, args.dataset)
 
-    with open(os.path.join(args.results_folder, "info.json"), "w") as f:
-        json.dump(path_list, f)
-    args.num_child_threads = min(len(path_list), args.num_child_threads)
-    items_per_child, remainder = divmod(len(path_list), args.num_child_threads)
-    split_list = [path_list[i: i + items_per_child] 
-                  for i in range(0, len(path_list), items_per_child)]
+    # Generate and save afferent population
+    affpop = ts.affpop_hand(density_multiplier=args.affpop_density_multiplier)
+    save_pkl(affpop, path_util.aff_pop_path)
+
+    # Generate [samples_per_texture] paths and apply those paths along each texture
+    task_list = []
+    texture_names = os.listdir(path_util.texture_set_dir)
+    for i in range(args.samples_per_texture):
+        path_points = generate_path(args.x_upperbound, args.y_upperbound, args.distance,
+                                    int(args.sample_frequency * args.stimulus_duration))
+        for file in texture_names:
+            data_dict = {
+                **vars(args),
+                "filename": os.path.join(path_util.texture_set_dir, file),
+                "path_points": path_points,
+                "id": f"{i}_{file}" 
+            }
+            task_list.append(data_dict)
+
+    # Save the task list
+    save_pkl(task_list, path_util.task_list_path)
+
+    # Reduce the number of child processes if there aren't enough tasks to complete
+    args.num_processes = min(len(task_list), args.num_processes)
+
+    # Split tasks evenly among child processes, with the last process taking on the
+    # remaining tasks if the number of tasks does not divide evenly
+    items_per_child, remainder = divmod(len(task_list), args.num_processes)
+    split_tasks = [task_list[i:i+items_per_child] 
+                  for i in range(0, len(task_list), items_per_child)]
     if remainder > 0:
-        split_list[-2].extend(split_list[-1])
-        del split_list[-1]
-    process_names = [f'P{i}' for i in range(args.num_child_threads)]
+        split_tasks[-2].extend(split_tasks[-1])
+        del split_tasks[-1]
+
+    # Create and run the child processes 
     processes = []
-    for i in range(len(process_names)):
-        process = multiprocessing.Process(target=child_process, args=(a, args.results_folder, process_names[i], split_list[i], len(path_list)))
+    num_total_tasks = len(task_list)
+    for i in range(len(split_tasks)):
+        process = Process(target=child_process,
+                          args=(affpop, path_util, split_tasks[i], num_total_tasks))
         processes.append(process)
         process.start()
 
+    # Wait for all child processes to complete before continuing
     for process in processes:
         process.join()
 
 
-
 if __name__ == "__main__":
-    os.chdir(os.path.join(".."))
+    parser = argparse.ArgumentParser(
+        description="Generate neural response data for a texture set",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # Create an argument parser
-    parser = argparse.ArgumentParser(description="Script for generating sample coordinates along a path of specified length")
+    parser.add_argument("--texture_set", type=str,
+                        help="Subdirectory of texture_sets to get textures from")
+    parser.add_argument("--dataset", type=str,
+                        help="Subdirectory of 'datasets' to store results in")
+    parser.add_argument("--num_processes", type=int, default=max(1, os.cpu_count()//4),
+                        help="The number of processes to run")
+    parser.add_argument("--stimulus_duration", type=float, default=1,
+                        help="The duration for which each stimulus persists [seconds]")
+    parser.add_argument("--sample_frequency", type=float, default=1000,
+                        help="The stimulus sampling rate [Hz]")
+    parser.add_argument("--samples_per_texture", type=int, default=1000,
+                        help="The number of samples to be generated for each texture")
+    parser.add_argument("--x_upperbound", type=int, default=60,
+                        help="Width of texture")
+    parser.add_argument("--y_upperbound", type=int, default=60,
+                        help="Height of texture")
+    parser.add_argument("--distance", type=float, default=50,
+                        help="Required length of line")
+    parser.add_argument("--pins_per_mm", type=float, default=1,
+                        help="Stimulus pin density")
+    parser.add_argument("--depth", type=float, default=0.5,
+                        help="Indentation depth [mm]")
+    parser.add_argument("--theta", type=float, default=0,
+                        help="Rotation of finger [rad]")
+    parser.add_argument("--affpop_density_multiplier", type=float, default=1,
+                        help="Factor to proportionally scale afferent density")
 
-    # Add arguments to the parser
-    parser.add_argument("--texture_file_directory", type=str, help="Directory to get textures from", required=True)
-    parser.add_argument("--results_folder", type=str, help="Directory to store results", required=True)
-    parser.add_argument("--num_child_threads", default=os.cpu_count(), type=int, help="Number of processes to run", required=True)
-    parser.add_argument("--texture_count", type=int, help="The number of textures to sample data from", required=True)
-    parser.add_argument("--stimulus_duration", type=float, help="The duration for which each stimulus persists", required=True)
-    parser.add_argument("--sample_frequency", type=float, help="The sampling rate for stimuli (in Hz)", required=True)
-    parser.add_argument("--samples_per_texture", type=int, help="The number of samples to be generated for each texture", required=True)
-    parser.add_argument("--x_upperbound", type=int, help="Upper bound for the maximum x coordinate", required=True)
-    parser.add_argument("--y_upperbound", type=int, help="Upper bound for the maximum y coordinate", required=True)
-    parser.add_argument("--distance", type=float, help="Required length of line", required=True)
-    parser.add_argument("--pins_per_mm", type=float, help="Stimulus pin density", required=True)
-    parser.add_argument("--depth", type=float, help="Indentation depth", required=True)
-    parser.add_argument("--theta", type=float, help="Rotation of finger", required=True)
-
-    # Parse the command-line arguments
     args = parser.parse_args()
 
-    # Call the main function with the provided arguments
-    main(args)
+    if args.texture_set is None:
+        args.texture_set = select_subdirectory(TEXTURE_SETS_DIR, "Select a texture set")
 
+    if args.dataset is None:
+        args.dataset = args.texture_set + "___" + PathUtil.timestamp 
+
+    main(args)
