@@ -1,13 +1,13 @@
 import os
-from  multiprocessing import Process
+from  multiprocessing import Process, Value
 import argparse
 import numpy as np
 import touchsim as ts
 from .helper import *
 
 
-def child_process(affpop, path_util, tasks, num_total_tasks):
-    """Process to run a subset of tasks. Note that all arguments should be read-only.
+def child_process(affpop, path_util, tasks, num_tasks_completed, num_total_tasks):
+    """Process to run a subset of tasks.
     """
     for task in tasks:
         texture = ts.Texture(filename=task["filename"], 
@@ -28,10 +28,10 @@ def child_process(affpop, path_util, tasks, num_total_tasks):
                 spikes = response[response.aff[aff_class]].spikes
             else:
                 spikes = response.spikes
-            save_pkl(spikes, os.path.join(dir_path, task["id"]))
+            save_pkl(spikes, join(dir_path, task["id"]))
 
-        num_tasks_completed = len(os.listdir(path_util.responses_dir))
-        print(f"{num_tasks_completed} / {num_total_tasks}")
+        num_tasks_completed.value += 1
+        print(f"{num_tasks_completed.value} / {num_total_tasks}", flush=True)
 
 
 def generate_path(x_upperbound, y_upperbound, distance, sample_count):
@@ -96,12 +96,16 @@ def main(args):
         split_tasks[-2].extend(split_tasks[-1])
         del split_tasks[-1]
 
+    # Create a shared counter with atomic operations
+    num_tasks_completed = Value("i", 0)
+
     # Create and run the child processes 
     processes = []
     num_total_tasks = len(task_list)
     for i in range(len(split_tasks)):
         process = Process(target=child_process,
-                          args=(affpop, path_util, split_tasks[i], num_total_tasks))
+                          args=(affpop, path_util, split_tasks[i], 
+                                num_tasks_completed, num_total_tasks))
         processes.append(process)
         process.start()
 
