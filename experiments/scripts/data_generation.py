@@ -1,4 +1,5 @@
 import os
+from os.path import join
 from  multiprocessing import Process, Value
 import argparse
 import numpy as np
@@ -19,9 +20,10 @@ def child_process(affpop, path_util, tasks, num_tasks_completed, num_total_tasks
                                             fs=task["sample_frequency"])
         response = affpop.response(stimulus)
 
-        save_pkl(response, os.path.join(path_util.responses_dir, task["id"]))
-        save_pkl(texture, os.path.join(path_util.textures_dir, task["id"]))
-        save_pkl(stimulus, os.path.join(path_util.stimuli_dir, task["id"]))
+        if task["save_all"]:
+            save_pkl(response, join(path_util.responses_dir, task["id"]))
+            save_pkl(texture, join(path_util.textures_dir, task["id"]))
+            save_pkl(stimulus, join(path_util.stimuli_dir, task["id"]))
 
         for aff_class, dir_path in path_util.aff_spikes_dirs.items():
             if aff_class in ts.constants.affclasses:
@@ -31,7 +33,7 @@ def child_process(affpop, path_util, tasks, num_tasks_completed, num_total_tasks
             save_pkl(spikes, join(dir_path, task["id"]))
 
         num_tasks_completed.value += 1
-        print(f"{num_tasks_completed.value} / {num_total_tasks}", flush=True)
+        print(f"{num_tasks_completed.value} / {num_total_tasks}", end="\r", flush=True)
 
 
 def generate_path(x_upperbound, y_upperbound, distance, sample_count):
@@ -60,7 +62,8 @@ def generate_path(x_upperbound, y_upperbound, distance, sample_count):
 
 def main(args):
     # Initialize PathUtil object for standardizing path names across scripts
-    path_util = PathUtil(args.texture_set, args.dataset)
+    path_util = PathUtil().dataset(args.dataset).texture_set(args.texture_set)
+    path_util.create_dataset_folders(save_all=args.save_all)
 
     # Generate and save afferent population
     affpop = ts.affpop_hand(density_multiplier=args.affpop_density_multiplier)
@@ -75,7 +78,7 @@ def main(args):
         for file in texture_names:
             data_dict = {
                 **vars(args),
-                "filename": os.path.join(path_util.texture_set_dir, file),
+                "filename": join(path_util.texture_set_dir, file),
                 "path_points": path_points,
                 "id": f"{i}_{file}" 
             }
@@ -122,7 +125,9 @@ if __name__ == "__main__":
     parser.add_argument("--texture_set", type=str,
                         help="Subdirectory of texture_sets to get textures from")
     parser.add_argument("--dataset", type=str,
-                        help="Subdirectory of 'datasets' to store results in")
+                        help="Subdirectory of datasets to store results in")
+    parser.add_argument("--save_all", action="store_true",
+                        help="Save all response, stimulus and texture information")
     parser.add_argument("--num_processes", type=int, default=max(1, os.cpu_count()//4),
                         help="The number of processes to run")
     parser.add_argument("--stimulus_duration", type=float, default=1,

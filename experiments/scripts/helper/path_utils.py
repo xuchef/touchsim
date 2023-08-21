@@ -1,47 +1,92 @@
 import os
+from os.path import join
 import datetime
 from .constants import *
 
 class PathUtil:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Shared timestamp for all instances
+
+    def texture_set(self, texture_set):
+        self.texture_set_dir = join(TEXTURE_SETS_DIR, texture_set)
+        return self
+
+    def dataset(self, dataset):
+        self.dataset_dir = join(DATASETS_DIR, dataset)
+
+        self.aff_pop_path = join(self.dataset_dir, "aff_pop")
+        self.task_list_path = join(self.dataset_dir, "task_list")
+        self.responses_dir = join(self.dataset_dir, "responses")
+        self.textures_dir = join(self.dataset_dir, "textures")
+        self.stimuli_dir = join(self.dataset_dir, "stimuli")
+
+        self.spikes_dir = join(self.dataset_dir, "spikes")
+        self.aff_spikes_dirs = aff_dirs(self.spikes_dir)
     
-    def __init__(self, texture_set, dataset, aff_class=None):
-        self.texture_set = texture_set
-        self.dataset = dataset 
-        self.aff_class = aff_class
+        self.training_dir = join(self.dataset_dir, "training")
+        self.aff_training_dirs = aff_dirs(self.training_dir)
 
-        self.texture_set_dir = os.path.join(TEXTURE_SETS_DIR, self.texture_set)
-        self.dataset_dir = os.path.join(DATASETS_DIR, self.dataset)
+        self.validation_dir = join(self.dataset_dir, "validation")
+        self.aff_validation_dirs = aff_dirs(self.validation_dir)
 
-        self.responses_dir = os.path.join(self.dataset_dir, "responses")
-        self.textures_dir = os.path.join(self.dataset_dir, "textures")
-        self.stimuli_dir = os.path.join(self.dataset_dir, "stimuli")
+        return self
 
-        self.task_list_path = os.path.join(self.dataset_dir, "task_list")
+    def model(self, model):
+        self.model_dir = join(MODELS_DIR, model)
 
-        self.spikes_dir = os.path.join(self.dataset_dir, "spikes")
-        self.aff_spikes_dirs = {aff_class : os.path.join(self.spikes_dir, aff_class) for aff_class in AFF_CHOICES}
+        self.aff_model_dirs = aff_dirs(self.model_dir)
 
-        self.create_dataset_folders()
+        self.aff_weight_paths = aff_dirs_dict(self.aff_model_dirs, "weights")
+        self.aff_training_log_paths = aff_dirs_dict(self.aff_model_dirs, "training_log")
+        self.aff_validation_log_paths = aff_dirs_dict(self.aff_model_dirs, "validation_log")
 
-        self.aff_pop_path = os.path.join(self.dataset_dir, "aff_pop")
+        return self
 
-        if self.aff_class is not None:
-            self.training_folder_path = os.path.join(self.dataset_dir, "training_data", self.aff_class)
-            self.validation_folder_path = os.path.join(self.dataset_dir, "validation_data", self.aff_class)
-            self.info_file_path = os.path.join(self.dataset_dir, "training_info", self.aff_class)
+    def create_dataset_folders(self, save_all=True):
+        assert self.dataset_dir is not None
+        paths = dict_vals_to_list(
+            self.aff_spikes_dirs,
+            self.aff_training_dirs,
+            self.aff_validation_dirs
+        )
+        if save_all:
+            paths += [self.responses_dir, self.textures_dir, self.stimuli_dir]
+        make_all_dirs(paths)
+        return self
 
-            self.model_weights_path = os.path.join(self.dataset_dir, "model_weights", self.aff_class, self.timestamp)
-            self.log_dir = os.path.join(self.dataset_dir, "logs", "fit", self.aff_class, self.timestamp)
+    def create_model_folders(self):
+        assert self.model_dir is not None
+        paths = dict_vals_to_list(
+            self.aff_model_dirs,
+            self.aff_weight_paths,
+            self.aff_training_log_paths,
+            self.aff_validation_log_paths
+        )
+        make_all_dirs(paths)
+        return self
 
-    def create_dataset_folders(self):
-        os.makedirs(self.dataset_dir, exist_ok=True)
-        os.makedirs(self.responses_dir, exist_ok=True)
-        os.makedirs(self.textures_dir, exist_ok=True)
-        os.makedirs(self.stimuli_dir, exist_ok=True)
-        os.makedirs(self.spikes_dir, exist_ok=True)
-        for dir_path in self.aff_spikes_dirs.values():
-            os.makedirs(dir_path, exist_ok=True)
+
+def dict_vals_to_list(*args):
+    paths = []
+    for d in args:
+        paths += list(d.values())
+    return paths
+
+
+def make_all_dirs(dirs):
+    for dir_path in dirs:
+        os.makedirs(dir_path, exist_ok=True)
+
+
+def aff_dirs_func(func):
+    return {aff_class : join(*func(aff_class)) for aff_class in AFF_CHOICES}
+
+
+def aff_dirs(path):
+    return aff_dirs_func(lambda a: [path, a])
+
+
+def aff_dirs_dict(dict, path):
+    return aff_dirs_func(lambda a: [dict[a], path])
 
 
 class NoSubdirectoriesError(Exception):
@@ -54,7 +99,7 @@ def select_subdirectory(directory, prompt="Select a subdirectory"):
     if not os.path.exists(directory):
         os.makedirs(directory)
 
-    subdirectories = [d for d in os.listdir(directory) if os.path.isdir(os.path.join(directory, d))]
+    subdirectories = [d for d in os.listdir(directory) if os.path.isdir(join(directory, d))]
     
     if not subdirectories:
         raise NoSubdirectoriesError(directory)
@@ -62,7 +107,7 @@ def select_subdirectory(directory, prompt="Select a subdirectory"):
     print(prompt)
     print("-"*len(prompt))
     for idx, subdir in enumerate(subdirectories, start=1):
-        subdir_path = os.path.join(directory, subdir)
+        subdir_path = join(directory, subdir)
         num_items = len(os.listdir(subdir_path))
         print(f"{idx}) {subdir} ({num_items} items)")
     print()
@@ -76,13 +121,3 @@ def select_subdirectory(directory, prompt="Select a subdirectory"):
                 print("Invalid option. Please choose a valid number.")
         except ValueError:
             print("Invalid input. Please enter a number.")
-
-
-if __name__ == "__main__":
-    # p = PathUtil("hello", "hi")
-    # p1 = PathUtil("HELLO", "HDLFHKL")
-
-    # print(p.timestamp)
-    # print(p1.timestamp)
-
-    print(select_subdirectory(TEXTURE_SETS_DIR))
