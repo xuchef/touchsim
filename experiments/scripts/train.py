@@ -1,42 +1,37 @@
 import argparse
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.utils import image_dataset_from_directory
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from .helper import *
+from .validate import validate_model
 
 
-def train_model(args, path_util, aff_class):
-    train_path = path_util.aff_training_dirs[aff_class]
-    test_path = path_util.aff_test_dirs[aff_class]
-
-    image_sizes = load_json(path_util.image_sizes_path)
-    img_width, img_height = image_sizes[aff_class]
-
-    train_dataset, val_dataset = image_dataset_from_directory(
-        train_path,
+def load_train_val_data(path, image_size, batch_size):
+    return image_dataset_from_directory(
+        path,
         label_mode="int", # experiment with non-sparse, "categorical"
         color_mode="grayscale",
-        batch_size=args.batch_size,
-        image_size=(img_height, img_width),
+        batch_size=batch_size,
+        image_size=image_size,
         validation_split=PERCENT_VALIDATION / (PERCENT_TRAINING + PERCENT_VALIDATION),
         subset="both",
         seed=SEED
     )
 
-    test_dataset = image_dataset_from_directory(
-        test_path,
-        batch_size=args.batch_size,
+
+def load_test_data(path, image_size):
+    return image_dataset_from_directory(
+        path,
+        batch_size=1,
         color_mode="grayscale",
-        image_size=(img_height, img_width)
+        image_size=image_size
     )
 
-    num_classes = len(train_dataset.class_names)
 
-    # Create a CNN model
-    model = Sequential([
-        Conv2D(32, (3, 3), activation='relu', input_shape=(img_height, img_width, 1)),
+def create_CNN_model(num_classes, image_size):
+    return Sequential([
+        Conv2D(32, (3, 3), activation='relu', input_shape=(*image_size, 1)),
         MaxPooling2D((2, 2)),
         Conv2D(64, (3, 3), activation='relu'),
         MaxPooling2D((2, 2)),
@@ -47,31 +42,42 @@ def train_model(args, path_util, aff_class):
         Dense(num_classes, activation='softmax')
     ])
 
-    # Compile the model
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
-    checkpoint_callback = ModelCheckpoint(
-        filepath=path_util.aff_weight_paths[aff_class],
+def callback_model_checkpoint(path):
+    return ModelCheckpoint(
+        filepath=path,
         save_best_only=True,
         monitor='val_accuracy',
         mode='max',
         verbose=1
     )
-    
-    tensorboard_callback = TensorBoard(
-         log_dir=path_util.aff_logs_paths[aff_class],
+
+
+def callback_tensorboard(path):
+    return TensorBoard(
+         log_dir=path,
          histogram_freq=1
     )
 
-    # Train the model
-    history = model.fit(train_dataset, epochs=args.epochs, validation_data=val_dataset,
-                        callbacks=[checkpoint_callback, tensorboard_callback])
 
-    # Evaluate the model
-    test_loss, test_accuracy = model.evaluate(test_dataset)
+def train_model(args, path_util, aff_class):
+    img_width, img_height = load_pkl(path_util.image_sizes_path)[aff_class]
+    image_size = (img_height, img_width)
 
-    print(f"Test Loss: {test_loss:.4f}")
-    print(f"Test Accuracy: {test_accuracy:.4f}")
+    train_dataset, val_dataset = load_train_val_data(path_util.aff_training_dirs[aff_class], image_size, args.batch_size)
+    test_dataset = load_test_data(path_util.aff_training_dirs[aff_class], image_size)
+
+    model = create_CNN_model(len(train_dataset.class_names), image_size)
+
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+
+    model.fit(train_dataset, epochs=args.epochs, validation_data=val_dataset,
+              callbacks=[
+                  callback_model_checkpoint(path_util.aff_weight_paths[aff_class]),
+                  callback_tensorboard(path_util.aff_logs_paths[aff_class])
+              ])
+
+    validate_model(path_util, aff_class)
 
 
 def main(args):
@@ -84,6 +90,7 @@ def main(args):
     for aff_class in AFF_CHOICES:
         print("\n", aff_class, "-"*30, sep="\n")
         train_model(args, path_util, aff_class)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

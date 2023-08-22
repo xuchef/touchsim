@@ -33,7 +33,7 @@ def plot_confusion_matrix(cm, class_names, aff_class, accuracy):
     return plt
 
 
-def validate_model(path_util, aff_class):
+def validate_model(path_util, aff_class, show_confusion_matrix=False):
     test_path = path_util.aff_test_dirs[aff_class]
 
     image_sizes = load_json(path_util.image_sizes_path)
@@ -74,7 +74,9 @@ def validate_model(path_util, aff_class):
 
     plot = plot_confusion_matrix(cm, class_names, aff_class, test_accuracy)
     plot.savefig(path_util.aff_confusion_matrix_paths[aff_class], dpi=300)
-    plot.show()
+
+    if show_confusion_matrix:
+        plot.show()
 
 
 def main(args):
