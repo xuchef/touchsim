@@ -65,6 +65,14 @@ class PathUtil:
         make_all_dirs(paths)
         return self
 
+    def create_category_folders(self, categories):
+        assert self.dataset_dir is not None
+        paths = dict_vals_to_list(
+            *[aff_dirs_dict(self.aff_training_dirs, c) for c in categories],
+            *[aff_dirs_dict(self.aff_validation_dirs, c) for c in categories]
+        )
+        make_all_dirs(paths)
+
 
 def dict_vals_to_list(*args):
     paths = []

@@ -1,101 +1,99 @@
-import touchsim as ts # import touchsim package
-from touchsim.plotting import plot # import in-built plotting function
+import touchsim as ts
 import numpy as np
-import holoviews as hv # import holoviews package for plots and set some parameters
 import os
-import json
-import pickle
+from os.path import join
 import argparse
-import shutil
 from PIL import Image
+from .helper import *
+import re
+from collections import defaultdict
 
 
-def extract_category(string):
-    return string.split("_", maxsplit=1)[1][:-4]
+def extract_category(path):
+    return re.search(r"/\d+_(.+?)(?:\.\w+)+$", path).group(1)
+
+
+def filter_aff_class(r, aff_class):
+    if aff_class not in ts.constants.affclasses:
+        return r
+    return r[r.aff[aff_class]]
+
+
+def get_threshold_indices(spikes, threshold):
+    return set([i for i, s in enumerate(spikes) if len(s) >= threshold])
 
 
 def main(args):
-    training_folder_path = os.path.join(args.results_folder, "training_data", args.aff_class)
-    validation_folder_path = os.path.join(args.results_folder, "validation_data", args.aff_class)
-    info_file_path = os.path.join(args.results_folder, "training_info", args.aff_class)
+    # Initialize PathUtil object for standardizing path names across scripts
+    path_util = PathUtil().dataset(args.dataset)
 
-    responses_folder_path = os.path.join(args.results_folder, "responses")
+    for aff_class in AFF_CHOICES:
+        print(aff_class)
+        dir_path = path_util.responses_dir
+        response_paths = [join(dir_path, i) for i in os.listdir(dir_path)]
 
-    idx = set()
-    max_val = 0
-    category_counts = {}
-    print("Get population data")
-    responses = os.listdir(responses_folder_path)
-    for i, file in enumerate(responses):
-        print(i, "/", len(responses), end="\r")
-        with open(os.path.join(responses_folder_path, file), "rb") as f:
-            r = pickle.load(f)
+        valid_indices = set()
+        max_val = 0
+        category_counts = defaultdict(int)
 
-        if args.aff_class in ts.constants.affclasses:
-            r =  r[r.aff[args.aff_class]]
+        print("Pass #1 of 2")
+        for i, path in enumerate(response_paths):
+            print(f"{i}/{len(response_paths)}", end="\r", flush=True)
+            category = extract_category(path)
+            category_counts[category] += 1
 
-        idx |= set([i for i in range(len(r.spikes)) if len(r.spikes[i]) >= args.min_spikes_threshold])
-        max_val = max(max_val, np.max(r.psth(args.bin_size)))
+            r = load_pkl(path)
+            r = filter_aff_class(r, aff_class)
+            valid_indices |= get_threshold_indices(r.spikes, args.min_spikes_threshold)
+            max_val = max(max_val, np.max(r.psth(args.bin_size)))
 
-        category = extract_category(file)
-        category_counts[category] = 1 if category not in category_counts else category_counts[category] + 1
+        valid_indices = np.array(list(valid_indices))
+        print(f"{len(valid_indices)} indices with a max of {max_val}")
 
-    idx = np.array(list(idx))
+        path_util.create_category_folders(category_counts.keys())
 
-    print("Num afferents:", len(idx))
-    print("Max val:", max_val)
+        print("Pass #2 of 2")
+        category_counts_cur = defaultdict(int)
+        for i, path in enumerate(response_paths):
+            print(f"{i}/{len(response_paths)}", end="\r", flush=True)
+            category = extract_category(path)
+            category_counts_cur[category] += 1
+            i = category_counts_cur[category] 
 
-    shutil.rmtree(training_folder_path, ignore_errors=True)
-    shutil.rmtree(validation_folder_path, ignore_errors=True)
-    os.makedirs(training_folder_path, exist_ok=True)
-    os.makedirs(validation_folder_path, exist_ok=True)
+            r = load_pkl(path)
+            r = filter_aff_class(r, aff_class)
 
-    print("Generate images")
-    category_counts_cur = {}
-    for i, file in enumerate(responses):
-        print(i, "/", len(responses), end="\r")
-        category = extract_category(file)
-        category_counts_cur[category] = 1 if category not in category_counts_cur else category_counts_cur[category] + 1
+            spike_histogram = r.psth(args.bin_size)
+            spike_histogram = spike_histogram[valid_indices]
+            spike_histogram = np.interp(spike_histogram, (0, max_val), (0, 255))
+            image = Image.fromarray(spike_histogram.astype(np.uint8), mode='L')
 
-        with open(os.path.join(responses_folder_path, file), "rb") as f:
-            r = pickle.load(f)
-
-        if args.aff_class in ts.constants.affclasses:
-            r =  r[r.aff[args.aff_class]]
-
-        os.makedirs(os.path.join(training_folder_path, category), exist_ok=True)
-        os.makedirs(os.path.join(validation_folder_path, category), exist_ok=True)
-
-        spike_histogram = r.psth(args.bin_size)
-        spike_histogram = spike_histogram[idx]
-        spike_histogram = np.interp(spike_histogram, (0, max_val), (0, 255))
-        image = Image.fromarray(spike_histogram.astype(np.uint8), mode='L')
-        directory = training_folder_path if (category_counts_cur[category]) / category_counts[category] * 100 <= args.percent_training else validation_folder_path
-        image.save(os.path.join(directory, category, f"{category_counts_cur[category]}.jpg"))
-
-    print(category_counts)
-
-    with open(info_file_path, "w") as f:
-        json.dump({
-            "width": image.size[0],
-            "height": image.size[1],
-            "num_classes": len(category_counts)
-        }, f)
+            percent_done = i / category_counts[category] * 100
+            if percent_done <= args.percent_training:
+                directory = path_util.aff_training_dirs[aff_class]
+            else:
+                directory = path_util.aff_validation_dirs[aff_class]
+            image.save(os.path.join(directory, category, f"{i}.jpg"))
+        print("-"*30)
 
 
 if __name__ == "__main__":
-    # Create an argument parser
-    parser = argparse.ArgumentParser(description="Script for generating training data")
+    parser = argparse.ArgumentParser(
+        description="Convert neural spike trains into jpg images to be used for training",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # Add arguments to the parser
-    parser.add_argument("--results_folder", type=str, help="Directory to obtain results from", required=True)
-    parser.add_argument("--bin_size", type=int, help="The bin size (x-axis) in ms", required=True)
-    parser.add_argument("--percent_training", type=float, help="The percent of data to allocate for training. Rest is validation.", required=True)
-    parser.add_argument("--min_spikes_threshold", type=int, help="The minimum number of spikes to filter for", required=True)
-    parser.add_argument("--aff_class", type=str, choices=['RA', 'SA1', 'PC', 'all'], help="The type of afferent to use for learning", required=True)
+    parser.add_argument("--dataset", type=str,
+                        help="Subdirectory of datasets to get results from")
+    parser.add_argument("--bin_size", type=int, default=5,
+                        help="The bin size for discretizing time [ms]")
+    parser.add_argument("--percent_training", type=float, default=80,
+                        help="The percent of data to allocate for training, the rest is validation")
+    parser.add_argument("--min_spikes_threshold", type=int, default=5,
+                        help="Filter out afferents with less total spikes than MIN_SPIKES_THRESHOLD")
 
-    # Parse the command-line arguments
     args = parser.parse_args()
 
-    # Call the main function with the provided arguments
+    if args.dataset is None:
+        args.dataset = select_subdirectory(DATASETS_DIR, "Select a dataset")
+
     main(args)
