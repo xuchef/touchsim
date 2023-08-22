@@ -10,7 +10,8 @@ from collections import defaultdict
 
 
 def extract_category(path):
-    return re.search(r"/\d+_(.+?)(?:\.\w+)+$", path).group(1)
+    path_sep = re.escape(os.path.sep)
+    return re.search(fr"{path_sep}\d+_(.+?)(?:\.\w+)+$", path).group(1)
 
 
 def filter_aff_class(r, aff_class):
