@@ -35,6 +35,8 @@ class PathUtil:
     def model(self, model):
         self.model_dir = join(MODELS_DIR, model)
 
+        self.model_info_path = join(self.model_dir, "model_info")
+
         self.aff_model_dirs = aff_dirs(self.model_dir)
 
         self.aff_weight_paths = aff_dirs_dict(self.aff_model_dirs, "weights.h5")

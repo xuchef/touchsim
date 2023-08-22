@@ -1,13 +1,11 @@
 import argparse
-import os
-from os.path import join
-from PIL import Image
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.utils import image_dataset_from_directory
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
 from .helper import *
+
 
 def train_model(args, path_util, aff_class):
     train_path = path_util.aff_training_dirs[aff_class]
@@ -79,6 +77,9 @@ def train_model(args, path_util, aff_class):
 def main(args):
     path_util = PathUtil().dataset(args.dataset).model(args.model)
     path_util.create_model_folders()
+
+    model_info = {"dataset": args.dataset}
+    save_json(model_info, path_util.model_info_path)
 
     for aff_class in AFF_CHOICES:
         print("\n", aff_class, "-"*30, sep="\n")
