@@ -23,6 +23,9 @@ class PathUtil:
 
         self.spikes_dir = join(self.dataset_dir, "spikes")
         self.aff_spikes_dirs = aff_dirs(self.spikes_dir)
+
+        self.psth_dir = join(self.dataset_dir, "psth")
+        self.aff_psth_dirs = aff_dirs(self.psth_dir)
     
         self.training_dir = join(self.dataset_dir, "training")
         self.aff_training_dirs = aff_dirs(self.training_dir)
@@ -49,6 +52,7 @@ class PathUtil:
         assert self.dataset_dir is not None
         paths = dict_vals_to_list(
             self.aff_spikes_dirs,
+            self.aff_psth_dirs,
             self.aff_training_dirs,
             self.aff_test_dirs
         )

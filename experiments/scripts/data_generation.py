@@ -25,12 +25,17 @@ def child_process(affpop, path_util, tasks, num_tasks_completed, num_total_tasks
             save_pkl(texture, join(path_util.textures_dir, task["id"]))
             save_pkl(stimulus, join(path_util.stimuli_dir, task["id"]))
 
-        for aff_class, dir_path in path_util.aff_spikes_dirs.items():
+        for aff_class in AFF_CHOICES:
             if aff_class in ts.constants.affclasses:
-                spikes = response[response.aff[aff_class]].spikes
+                r = response[response.aff[aff_class]]
             else:
-                spikes = response.spikes
-            save_pkl(spikes, join(dir_path, task["id"]))
+                r = response
+
+            for dir_path in path_util.aff_spikes_dirs.values():
+                save_pkl(r.spikes, join(dir_path, task["id"]))
+
+            for dir_path in path_util.aff_psth_dirs.values():
+                save_pkl(r.psth(task["bin_size"]), join(dir_path, task["id"]))
 
         num_tasks_completed.value += 1
         print(f"{num_tasks_completed.value} / {num_total_tasks}", end="\r", flush=True)
@@ -150,6 +155,8 @@ if __name__ == "__main__":
                         help="Rotation of finger [rad]")
     parser.add_argument("--affpop_density_multiplier", type=float, default=1,
                         help="Factor to proportionally scale afferent density")
+    parser.add_argument("--bin_size", type=int, default=5,
+                        help="The bin size for discretizing time [ms]")
 
     args = parser.parse_args()
 
