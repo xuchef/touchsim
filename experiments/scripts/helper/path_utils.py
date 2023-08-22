@@ -25,8 +25,8 @@ class PathUtil:
         self.training_dir = join(self.dataset_dir, "training")
         self.aff_training_dirs = aff_dirs(self.training_dir)
 
-        self.validation_dir = join(self.dataset_dir, "validation")
-        self.aff_validation_dirs = aff_dirs(self.validation_dir)
+        self.test_dir = join(self.dataset_dir, "test")
+        self.aff_test_dirs = aff_dirs(self.test_dir)
 
         return self
 
@@ -36,8 +36,7 @@ class PathUtil:
         self.aff_model_dirs = aff_dirs(self.model_dir)
 
         self.aff_weight_paths = aff_dirs_dict(self.aff_model_dirs, "weights")
-        self.aff_training_log_paths = aff_dirs_dict(self.aff_model_dirs, "training_log")
-        self.aff_validation_log_paths = aff_dirs_dict(self.aff_model_dirs, "validation_log")
+        self.aff_logs_paths = aff_dirs_dict(self.aff_model_dirs, "logs")
 
         return self
 
@@ -46,7 +45,7 @@ class PathUtil:
         paths = dict_vals_to_list(
             self.aff_spikes_dirs,
             self.aff_training_dirs,
-            self.aff_validation_dirs
+            self.aff_test_dirs
         )
         paths.append(self.responses_dir)
         if save_all:
@@ -59,8 +58,7 @@ class PathUtil:
         paths = dict_vals_to_list(
             self.aff_model_dirs,
             self.aff_weight_paths,
-            self.aff_training_log_paths,
-            self.aff_validation_log_paths
+            self.aff_logs_paths
         )
         make_all_dirs(paths)
         return self
@@ -69,7 +67,7 @@ class PathUtil:
         assert self.dataset_dir is not None
         paths = dict_vals_to_list(
             *[aff_dirs_dict(self.aff_training_dirs, c) for c in categories],
-            *[aff_dirs_dict(self.aff_validation_dirs, c) for c in categories]
+            *[aff_dirs_dict(self.aff_test_dirs, c) for c in categories]
         )
         make_all_dirs(paths)
 

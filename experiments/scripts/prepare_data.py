@@ -69,10 +69,10 @@ def main(args):
             image = Image.fromarray(spike_histogram.astype(np.uint8), mode='L')
 
             percent_done = i / category_counts[category] * 100
-            if percent_done <= args.percent_training:
+            if percent_done <= PERCENT_TRAINING + PERCENT_VALIDATION:
                 directory = path_util.aff_training_dirs[aff_class]
             else:
-                directory = path_util.aff_validation_dirs[aff_class]
+                directory = path_util.aff_test_dirs[aff_class]
             image.save(os.path.join(directory, category, f"{i}.jpg"))
         print("-"*30)
 
@@ -86,8 +86,6 @@ if __name__ == "__main__":
                         help="Subdirectory of datasets to get results from")
     parser.add_argument("--bin_size", type=int, default=5,
                         help="The bin size for discretizing time [ms]")
-    parser.add_argument("--percent_training", type=float, default=80,
-                        help="The percent of data to allocate for training, the rest is validation")
     parser.add_argument("--min_spikes_threshold", type=int, default=5,
                         help="Filter out afferents with less total spikes than MIN_SPIKES_THRESHOLD")
 
