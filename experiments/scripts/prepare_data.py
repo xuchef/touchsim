@@ -31,6 +31,7 @@ def main(args):
         print(aff_class)
         dir_path = path_util.responses_dir
         response_paths = [join(dir_path, i) for i in os.listdir(dir_path)]
+        np.random.shuffle(response_paths)
 
         valid_indices = set()
         max_val = 0
