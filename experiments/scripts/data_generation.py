@@ -20,8 +20,8 @@ def child_process(affpop, path_util, tasks, num_tasks_completed, num_total_tasks
                                             fs=task["sample_frequency"])
         response = affpop.response(stimulus)
 
+        save_pkl(response, join(path_util.responses_dir, task["id"]))
         if task["save_all"]:
-            save_pkl(response, join(path_util.responses_dir, task["id"]))
             save_pkl(texture, join(path_util.textures_dir, task["id"]))
             save_pkl(stimulus, join(path_util.stimuli_dir, task["id"]))
 
@@ -127,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str,
                         help="Subdirectory of datasets to store results in")
     parser.add_argument("--save_all", action="store_true",
-                        help="Save all response, stimulus and texture information")
+                        help="Save all stimulus and texture information")
     parser.add_argument("--num_processes", type=int, default=max(1, os.cpu_count()//4),
                         help="The number of processes to run")
     parser.add_argument("--stimulus_duration", type=float, default=1,

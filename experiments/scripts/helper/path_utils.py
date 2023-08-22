@@ -48,8 +48,9 @@ class PathUtil:
             self.aff_training_dirs,
             self.aff_validation_dirs
         )
+        paths.append(self.responses_dir)
         if save_all:
-            paths += [self.responses_dir, self.textures_dir, self.stimuli_dir]
+            paths += [self.textures_dir, self.stimuli_dir]
         make_all_dirs(paths)
         return self
 
