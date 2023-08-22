@@ -41,6 +41,7 @@ class PathUtil:
 
         self.aff_weight_paths = aff_dirs_dict(self.aff_model_dirs, "weights.h5")
         self.aff_logs_paths = aff_dirs_dict(self.aff_model_dirs, "logs")
+        self.aff_confusion_matrix_paths = aff_dirs_dict(self.aff_model_dirs, "confusion_matrix.png")
 
         return self
 

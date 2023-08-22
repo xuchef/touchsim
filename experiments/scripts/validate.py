@@ -1,45 +1,106 @@
-import numpy as np
-import os
-from PIL import Image
 import argparse
+from tensorflow.keras.utils import image_dataset_from_directory
 from tensorflow.keras.models import load_model
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix, classification_report
+from .helper import *
+
+
+def plot_confusion_matrix(cm, class_names, aff_class, accuracy):
+    plt.figure(figsize=(8, 8))
+    plt.imshow(cm, interpolation='nearest', cmap="Blues")
+
+    plt.title(f"{aff_class} Confusion Matrix", fontsize=16, pad=30)
+    plt.text(0.5, 1.03, f"{accuracy*100:.2f}% accuracy", 
+             fontsize=12, color="gray", ha="center", transform=plt.gca().transAxes)
+    plt.colorbar(shrink=0.5)
+
+    tick_marks = np.arange(len(class_names))
+    plt.xticks(tick_marks, class_names, rotation=70, fontsize=8)
+    plt.yticks(tick_marks, class_names, fontsize=8)
+
+    plt.xlabel("Predicted Class", fontsize=12, labelpad=20)
+    plt.ylabel("True Class", fontsize=12, labelpad=20)
+
+    thresh = cm.max() / 2
+    for i in range(len(class_names)):
+        for j in range(len(class_names)):
+            plt.text(j, i, format(cm[i, j], "d"), ha="center", va="center",
+                     color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    return plt
+
+
+def validate_model(path_util, aff_class):
+    test_path = path_util.aff_test_dirs[aff_class]
+
+    image_sizes = load_json(path_util.image_sizes_path)
+    img_width, img_height = image_sizes[aff_class]
+
+    test_dataset = image_dataset_from_directory(
+        test_path,
+        label_mode="int",
+        batch_size=1,
+        color_mode="grayscale",
+        image_size=(img_height, img_width)
+    )
+
+    class_names = test_dataset.class_names
+    class_names = [i.split("_")[0] for i in class_names]
+
+    model = load_model(path_util.aff_weight_paths[aff_class])
+
+    test_loss, test_accuracy = model.evaluate(test_dataset)
+
+    print(f"Test Loss: {test_loss:.4f}")
+    print(f"Test Accuracy: {test_accuracy:.4f}")
+
+    test_images = []
+    test_labels = []
+    for images, labels in test_dataset:
+        test_images.append(images)
+        test_labels.append(labels)
+    test_images = np.vstack(test_images)
+    test_labels = np.vstack(test_labels).flatten()
+
+    predictions = model.predict(test_images)
+    predicted_labels = np.argmax(predictions, axis=1)
+
+    cm = confusion_matrix(test_labels, predicted_labels)
+    report = classification_report(test_labels, predicted_labels, target_names=class_names)
+    print(report)
+
+    plot = plot_confusion_matrix(cm, class_names, aff_class, test_accuracy)
+    plot.savefig(path_util.aff_confusion_matrix_paths[aff_class], dpi=300)
+    plot.show()
+
 
 def main(args):
-    training_folder_name = f"training_data_{args.aff_class}" if args.aff_class else "training_data"
-    validation_folder_name = f"validation_data_{args.aff_class}" if args.aff_class else "validation_data"
-    model_weights_file_name = f"model_weights_{args.aff_class}_{args.batch_size}.h5" if args.aff_class else f"model_weights_{args.batch_size}"
+    path_util = PathUtil().model(args.model)
 
-    model = load_model(os.path.join(args.results_folder, model_weights_file_name))
+    model_info = load_json(path_util.model_info_path)
 
-    num_correct = 0
-    total = 0
-    for i, category in enumerate(os.listdir(os.path.join(args.results_folder, training_folder_name))):
-        for file in os.listdir(os.path.join(args.results_folder, training_folder_name, category)):
-            test_image_path = os.path.join(args.results_folder, training_folder_name, category, file)
-            test_image = np.expand_dims(np.array(Image.open(test_image_path).convert("L")), axis=0)
+    dataset = model_info["dataset"]
+    path_util.dataset(dataset)
 
-            predictions = model.predict(test_image, verbose=0)
-            predicted_class_index = np.argmax(predictions[0])
-
-            print("X" if predicted_class_index else "O", end=" ")
-            if predicted_class_index == i:
-                num_correct += 1
-            total += 1
-        print()
-    print(num_correct / total * 100)
+    for aff_class in AFF_CHOICES:
+        print("\n", aff_class, "-"*30, sep="\n")
+        validate_model(path_util, aff_class)
 
 
 if __name__ == "__main__":
-    # Create an argument parser
-    parser = argparse.ArgumentParser(description="Validate results")
+    parser = argparse.ArgumentParser(
+        description="Test CNN for texture classification based on neural spike trains jpg",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # Add arguments to the parser
-    parser.add_argument("--results_folder", type=str, help="Directory to obtain results from")
-    parser.add_argument("--aff_class", type=str, help="The type of afferent to use for learning")
-    parser.add_argument("--batch_size", type=int, help="Training batch size")
+    parser.add_argument("--model", type=str,
+                        help="Subdirectory of models to validate")
 
-    # Parse the command-line arguments
     args = parser.parse_args()
 
-    # Call the main function with the provided arguments
+    if args.model is None:
+        args.model = select_subdirectory(MODELS_DIR, "Select a model")
+
     main(args)
