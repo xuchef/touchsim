@@ -1,59 +1,40 @@
-import numpy as np
-import os
-import json
-import tensorflow as tf
 import argparse
+import os
+from os.path import join
+from PIL import Image
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.callbacks import ModelCheckpoint
-import datetime
+from tensorflow.keras.utils import image_dataset_from_directory
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from .helper import *
 
+def train_model(args, path_util, aff_class):
+    train_path = path_util.aff_training_dirs[aff_class]
+    test_path = path_util.aff_test_dirs[aff_class]
 
-def main(args):
-    training_folder_path = os.path.join(args.results_folder, "training_data", args.aff_class)
-    validation_folder_path = os.path.join(args.results_folder, "validation_data", args.aff_class)
-    info_file_path = os.path.join(args.results_folder, "training_info", args.aff_class)
+    image_sizes = load_json(path_util.image_sizes_path)
+    img_width, img_height = image_sizes[aff_class]
 
-    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-
-    model_weights_path = os.path.join(args.results_folder, "model_weights", args.aff_class, timestamp)
-
-    log_dir = os.path.join(args.results_folder, "logs", "fit", args.aff_class, timestamp)
-
-    with open(info_file_path) as f:
-        training_info = json.load(f)
-
-    # Define image dimensions and categories
-    img_width = training_info["width"]
-    img_height = training_info["height"]
-    num_classes = training_info["num_classes"]
-
-    # Create data generators with data augmentation for training and validation
-    train_datagen = ImageDataGenerator(
-        rescale=1.0 / 255,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True
-    )
-
-    train_generator = train_datagen.flow_from_directory(
-        training_folder_path,
-        target_size=(img_height, img_width),
+    train_dataset, val_dataset = image_dataset_from_directory(
+        train_path,
+        label_mode="int", # experiment with non-sparse, "categorical"
+        color_mode="grayscale",
         batch_size=args.batch_size,
-        class_mode='categorical',
-        color_mode='grayscale'
+        image_size=(img_height, img_width),
+        validation_split=PERCENT_VALIDATION / (PERCENT_TRAINING + PERCENT_VALIDATION),
+        subset="both",
+        seed=SEED
     )
 
-    validation_datagen = ImageDataGenerator(rescale=1.0 / 255)
-
-    validation_generator = validation_datagen.flow_from_directory(
-        validation_folder_path,
-        target_size=(img_height, img_width),
+    test_dataset = image_dataset_from_directory(
+        test_path,
         batch_size=args.batch_size,
-        class_mode='categorical',
-        color_mode='grayscale'
+        color_mode="grayscale",
+        image_size=(img_height, img_width)
     )
+
+    num_classes = len(train_dataset.class_names)
 
     # Create a CNN model
     model = Sequential([
@@ -68,57 +49,61 @@ def main(args):
         Dense(num_classes, activation='softmax')
     ])
 
-    # model = Sequential([
-    #     Conv2D(32, (3, 3), activation='relu', input_shape=(img_height, img_width, 1)),
-    #     MaxPooling2D((2, 2)),
-    #     Conv2D(64, (3, 3), activation='relu'),
-    #     MaxPooling2D((2, 2)),
-    #     Conv2D(128, (3, 3), activation='relu'),
-    #     MaxPooling2D((2, 2)),
-    #     Conv2D(256, (3, 3), activation='relu'),  # Additional layer
-    #     MaxPooling2D((2, 2)),
-    #     Conv2D(512, (3, 3), activation='relu'),  # Additional layer
-    #     MaxPooling2D((2, 2)),
-    #     Flatten(),
-    #     Dense(512, activation='relu'),  # Increased units
-    #     Dense(128, activation='relu'),
-    #     Dense(num_classes, activation='softmax')
-    # ])
-
     # Compile the model
-    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
 
     checkpoint_callback = ModelCheckpoint(
-        filepath=model_weights_path,
-        save_best_only=True,  # Only save the model with the best validation accuracy
-        monitor='val_accuracy',  # Monitor validation accuracy
-        mode='max',  # Mode can be 'min', 'max', or 'auto'
-        verbose=1  # Display messages when saving models
+        filepath=path_util.aff_weight_paths[aff_class],
+        save_best_only=True,
+        monitor='val_accuracy',
+        mode='max',
+        verbose=1
     )
     
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
+    tensorboard_callback = TensorBoard(
+         log_dir=path_util.aff_logs_paths[aff_class],
+         histogram_freq=1
+    )
 
     # Train the model
-    history = model.fit(train_generator, epochs=args.epochs, validation_data=validation_generator,
+    history = model.fit(train_dataset, epochs=args.epochs, validation_data=val_dataset,
                         callbacks=[checkpoint_callback, tensorboard_callback])
 
     # Evaluate the model
-    test_loss, test_accuracy = model.evaluate(validation_generator)
-    print("Test accuracy:", test_accuracy)
+    test_loss, test_accuracy = model.evaluate(test_dataset)
 
+    print(f"Test Loss: {test_loss:.4f}")
+    print(f"Test Accuracy: {test_accuracy:.4f}")
+
+
+def main(args):
+    path_util = PathUtil().dataset(args.dataset).model(args.model)
+    path_util.create_model_folders()
+
+    for aff_class in AFF_CHOICES:
+        print("\n", aff_class, "-"*30, sep="\n")
+        train_model(args, path_util, aff_class)
 
 if __name__ == "__main__":
-    # Create an argument parser
-    parser = argparse.ArgumentParser(description="Train CNN for binary texture classification based on neuron firing image")
+    parser = argparse.ArgumentParser(
+        description="Train CNN for texture classification based on neural spike trains jpg",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    # Add arguments to the parser
-    parser.add_argument("--results_folder", type=str, help="Directory to obtain results from", required=True)
-    parser.add_argument("--aff_class", type=str, choices=['RA', 'SA1', 'PC', 'all'], help="The type of afferent to use for learning", required=True)
-    parser.add_argument("--epochs", type=int, help="Number of training epochs", required=True)
-    parser.add_argument("--batch_size", type=int, help="Training batch size", required=True)
+    parser.add_argument("--dataset", type=str,
+                        help="Subdirectory of datasets to train on")
+    parser.add_argument("--model", type=str,
+                        help="Subdirectory of models to store model in")
+    parser.add_argument("--epochs", type=int, default=50,
+                        help="Number of training epochs")
+    parser.add_argument("--batch_size", type=int, default=16,
+                        help="Training batch size")
 
-    # Parse the command-line arguments
     args = parser.parse_args()
 
-    # Call the main function with the provided arguments
+    if args.dataset is None:
+        args.dataset = select_subdirectory(DATASETS_DIR, "Select a dataset")
+    
+    if args.model is None:
+            args.model = "CNN___" + args.dataset.split("___")[0]
+
     main(args)

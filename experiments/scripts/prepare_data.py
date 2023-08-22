@@ -27,6 +27,8 @@ def main(args):
     # Initialize PathUtil object for standardizing path names across scripts
     path_util = PathUtil().dataset(args.dataset)
 
+    image_sizes = {}
+
     for aff_class in AFF_CHOICES:
         print(aff_class)
         dir_path = path_util.responses_dir
@@ -75,7 +77,9 @@ def main(args):
             else:
                 directory = path_util.aff_test_dirs[aff_class]
             image.save(os.path.join(directory, category, f"{i}.jpg"))
+        image_sizes[aff_class] = image.size
         print("-"*30)
+    save_json(image_sizes, path_util.image_sizes_path)
 
 
 if __name__ == "__main__":

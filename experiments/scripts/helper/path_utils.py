@@ -2,6 +2,7 @@ import os
 from os.path import join
 import datetime
 from .constants import *
+from .data_utils import *
 
 class PathUtil:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Shared timestamp for all instances
@@ -15,6 +16,7 @@ class PathUtil:
 
         self.aff_pop_path = join(self.dataset_dir, "aff_pop")
         self.task_list_path = join(self.dataset_dir, "task_list")
+        self.image_sizes_path = join(self.dataset_dir, "image_sizes")
         self.responses_dir = join(self.dataset_dir, "responses")
         self.textures_dir = join(self.dataset_dir, "textures")
         self.stimuli_dir = join(self.dataset_dir, "stimuli")
@@ -35,7 +37,7 @@ class PathUtil:
 
         self.aff_model_dirs = aff_dirs(self.model_dir)
 
-        self.aff_weight_paths = aff_dirs_dict(self.aff_model_dirs, "weights")
+        self.aff_weight_paths = aff_dirs_dict(self.aff_model_dirs, "weights.h5")
         self.aff_logs_paths = aff_dirs_dict(self.aff_model_dirs, "logs")
 
         return self
@@ -57,7 +59,6 @@ class PathUtil:
         assert self.model_dir is not None
         paths = dict_vals_to_list(
             self.aff_model_dirs,
-            self.aff_weight_paths,
             self.aff_logs_paths
         )
         make_all_dirs(paths)
