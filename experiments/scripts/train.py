@@ -82,6 +82,7 @@ def train_model(args, path_util, aff_class):
 
 def main(args):
     path_util = PathUtil().dataset(args.dataset).model(args.model)
+    path_util.dataset_folders(["training", "test"])
     path_util.create_model_folders()
 
     model_info = {"dataset": args.dataset}
