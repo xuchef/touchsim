@@ -86,6 +86,7 @@ def main(args):
 
     dataset = model_info["dataset"]
     path_util.dataset(dataset)
+    path_util.dataset_folders(["training", "test"])
 
     for aff_class in AFF_CHOICES:
         print("\n", aff_class, "-"*30, sep="\n")
