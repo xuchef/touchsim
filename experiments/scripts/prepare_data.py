@@ -45,6 +45,7 @@ def run_quick_mode(args, path_util, dataset_info):
         valid_indices = set()
         max_val = 0
 
+        print("\n", aff_class, "-"*30, sep="\n", flush=True)
         print("Pass #1 of 2", flush=True)
         for category in dataset_info["categories"]:
             for i in range(dataset_info["samples_per_texture"]):
@@ -71,7 +72,6 @@ def run_quick_mode(args, path_util, dataset_info):
                 save_image(image, path_util, aff_class, category, i, dataset_info["samples_per_texture"])
 
         image_sizes[aff_class] = image.size
-        print("-"*30)
 
     save_json(image_sizes, path_util.image_sizes_path)
 

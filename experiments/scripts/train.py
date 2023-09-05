@@ -61,7 +61,7 @@ def callback_tensorboard(path):
 
 
 def train_model(args, path_util, aff_class):
-    img_width, img_height = load_pkl(path_util.image_sizes_path)[aff_class]
+    img_width, img_height = load_json(path_util.image_sizes_path)[aff_class]
     image_size = (img_height, img_width)
 
     train_dataset, val_dataset = load_train_val_data(path_util.aff_training_dirs[aff_class], image_size, args.batch_size)
