@@ -4,61 +4,81 @@ import datetime
 from .constants import *
 from .data_utils import *
 
+
 class PathUtil:
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")  # Shared timestamp for all instances
+
+    def __init__(self):
+        self.dataset_attr_names = {}
+        self.dataset_aff_attr_names = {}
+
+    def getattrs(self, attrs):
+        return [getattr(self, a) for a in attrs]
 
     def texture_set(self, texture_set):
         self.texture_set_dir = join(TEXTURE_SETS_DIR, texture_set)
         return self
 
+    def add_dataset_dir(self, name):
+        assert self.dataset_dir is not None
+
+        attr_name = f"{name}_dir"
+        path = join(self.dataset_dir, name)
+        setattr(self, attr_name, path)
+        self.dataset_attr_names[name] = attr_name
+        return path
+    
+    def add_dataset_dir_with_affs(self, name):
+        assert self.dataset_dir is not None
+
+        attr_dir_path = self.add_dataset_dir(name)
+        self.dataset_attr_names.pop(name)
+        
+        aff_attr_name = f"aff_{name}_dirs"
+        aff_paths = aff_dirs(attr_dir_path)
+        setattr(self, aff_attr_name, aff_paths)
+        self.dataset_aff_attr_names[name] = aff_attr_name
+
     def dataset(self, dataset):
         self.dataset_dir = join(DATASETS_DIR, dataset)
 
-        self.aff_pop_path = join(self.dataset_dir, "aff_pop")
+        self.dataset_info_path = join(self.dataset_dir, "dataset_info")
+        self.affpop_path = join(self.dataset_dir, "affpop")
         self.task_list_path = join(self.dataset_dir, "task_list")
         self.image_sizes_path = join(self.dataset_dir, "image_sizes")
-        self.responses_dir = join(self.dataset_dir, "responses")
-        self.textures_dir = join(self.dataset_dir, "textures")
-        self.stimuli_dir = join(self.dataset_dir, "stimuli")
 
-        self.spikes_dir = join(self.dataset_dir, "spikes")
-        self.aff_spikes_dirs = aff_dirs(self.spikes_dir)
+        return self
 
-        self.psth_dir = join(self.dataset_dir, "psth")
-        self.aff_psth_dirs = aff_dirs(self.psth_dir)
-    
-        self.training_dir = join(self.dataset_dir, "training")
-        self.aff_training_dirs = aff_dirs(self.training_dir)
+    def dataset_folders(self, folder_names):
+        assert self.dataset_dir is not None
 
-        self.test_dir = join(self.dataset_dir, "test")
-        self.aff_test_dirs = aff_dirs(self.test_dir)
+        for name in folder_names:
+            if name in SIMPLE_ATTRS:
+                self.add_dataset_dir(name)
+            elif name in ["spikes", "psth", "training", "test"]:
+                self.add_dataset_dir_with_affs(name)
+            else:
+                raise NotImplementedError(f"Custom folder structure not implemented: {name}")
 
         return self
 
     def model(self, model):
         self.model_dir = join(MODELS_DIR, model)
 
-        self.model_info_path = join(self.model_dir, "model_info")
-
         self.aff_model_dirs = aff_dirs(self.model_dir)
 
+        self.model_info_path = join(self.model_dir, "model_info")
+
+        self.aff_logs_dirs = aff_dirs_dict(self.aff_model_dirs, "logs")
         self.aff_weight_paths = aff_dirs_dict(self.aff_model_dirs, "weights.keras")
-        self.aff_logs_paths = aff_dirs_dict(self.aff_model_dirs, "logs")
         self.aff_confusion_matrix_paths = aff_dirs_dict(self.aff_model_dirs, "confusion_matrix.png")
 
         return self
 
-    def create_dataset_folders(self, save_all=True):
+    def create_dataset_folders(self):
         assert self.dataset_dir is not None
-        paths = dict_vals_to_list(
-            self.aff_spikes_dirs,
-            self.aff_psth_dirs,
-            self.aff_training_dirs,
-            self.aff_test_dirs
-        )
-        paths.append(self.responses_dir)
-        if save_all:
-            paths += [self.textures_dir, self.stimuli_dir]
+        paths = self.getattrs(self.dataset_attr_names.values())
+        paths += dict_vals_to_list(*self.getattrs(self.dataset_aff_attr_names.values()))
         make_all_dirs(paths)
         return self
 
@@ -66,18 +86,19 @@ class PathUtil:
         assert self.model_dir is not None
         paths = dict_vals_to_list(
             self.aff_model_dirs,
-            self.aff_logs_paths
+            self.aff_logs_dirs
         )
         make_all_dirs(paths)
         return self
 
     def create_category_folders(self, categories):
         assert self.dataset_dir is not None
-        paths = dict_vals_to_list(
-            *[aff_dirs_dict(self.aff_training_dirs, c) for c in categories],
-            *[aff_dirs_dict(self.aff_test_dirs, c) for c in categories]
-        )
-        make_all_dirs(paths)
+        for dir in self.getattrs(self.dataset_attr_names.values()):
+            paths = [join(dir, c) for c in categories]
+            make_all_dirs(paths)
+        for dir in self.getattrs(self.dataset_aff_attr_names.values()):
+            paths = dict_vals_to_list(*[aff_dirs_dict(dir, c) for c in categories])
+            make_all_dirs(paths)
 
 
 def dict_vals_to_list(*args):

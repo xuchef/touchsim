@@ -11,6 +11,9 @@ def child_process(affpop, path_util, tasks, num_tasks_completed, num_total_tasks
     """Process to run a subset of tasks.
     """
     for task in tasks:
+        def file_path(parent_path):
+            return join(parent_path, task["category"], str(task["id"]))
+
         texture = ts.Texture(filename=task["filename"], 
                              size=(task["x_upperbound"], task["y_upperbound"]), 
                              max_height=2)
@@ -20,22 +23,26 @@ def child_process(affpop, path_util, tasks, num_tasks_completed, num_total_tasks
                                             fs=task["sample_frequency"])
         response = affpop.response(stimulus)
 
-        save_pkl(response, join(path_util.responses_dir, task["id"]))
-        if task["save_all"]:
-            save_pkl(texture, join(path_util.textures_dir, task["id"]))
-            save_pkl(stimulus, join(path_util.stimuli_dir, task["id"]))
+        for attr in task["save_attrs"]:
+            def save_filtered_response(func):
+                for aff_class in AFF_CHOICES:
+                    if aff_class in ts.constants.affclasses:
+                        r = response[response.aff[aff_class]]
+                    else:
+                        r = response
+                    path = getattr(path_util, path_util.dataset_aff_attr_names[attr])[aff_class]
+                    save_pkl(func(r), file_path(path))
 
-        for aff_class in AFF_CHOICES:
-            if aff_class in ts.constants.affclasses:
-                r = response[response.aff[aff_class]]
+            if attr in SIMPLE_ATTRS:
+                val = locals()[attr]
+                path = file_path(getattr(path_util, path_util.dataset_attr_names[attr]))
+                save_pkl(val, path)
+            elif attr == "spikes":
+                save_filtered_response(lambda r: r.spikes)
+            elif attr == "psth":
+                save_filtered_response(lambda r: r.psth(1))
             else:
-                r = response
-
-            for dir_path in path_util.aff_spikes_dirs.values():
-                save_pkl(r.spikes, join(dir_path, task["id"]))
-
-            for dir_path in path_util.aff_psth_dirs.values():
-                save_pkl(r.psth(task["bin_size"]), join(dir_path, task["id"]))
+                raise NotImplementedError(f"Custom attribute behaviour not implemented: {attr}")
 
         num_tasks_completed.value += 1
         print(f"{num_tasks_completed.value} / {num_total_tasks}", end="\r", flush=True)
@@ -67,16 +74,26 @@ def generate_path(x_upperbound, y_upperbound, distance, sample_count):
 
 def main(args):
     # Initialize PathUtil object for standardizing path names across scripts
-    path_util = PathUtil().dataset(args.dataset).texture_set(args.texture_set)
-    path_util.create_dataset_folders(save_all=args.save_all)
+    path_util = PathUtil().dataset(args.dataset).dataset_folders(args.save_attrs).texture_set(args.texture_set)
+    path_util.create_dataset_folders()
+
+    # Obtain the texture names in the directory
+    texture_names = os.listdir(path_util.texture_set_dir)
+
+    # Extract the category names by removing the file extension
+    categories = [remove_ext(i) for i in texture_names]
+    path_util.create_category_folders(categories)
+
+    # Save the parameters used to generate the dataset
+    dataset_info = {**vars(args), "categories": categories}
+    save_json(dataset_info, path_util.dataset_info_path)
 
     # Generate and save afferent population
     affpop = ts.affpop_hand(density_multiplier=args.affpop_density_multiplier)
-    save_pkl(affpop, path_util.aff_pop_path)
+    save_pkl(affpop, path_util.affpop_path)
 
     # Generate [samples_per_texture] paths and apply those paths along each texture
     task_list = []
-    texture_names = os.listdir(path_util.texture_set_dir)
     for i in range(args.samples_per_texture):
         path_points = generate_path(args.x_upperbound, args.y_upperbound, args.distance,
                                     int(args.sample_frequency * args.stimulus_duration))
@@ -84,8 +101,9 @@ def main(args):
             data_dict = {
                 **vars(args),
                 "filename": join(path_util.texture_set_dir, file),
+                "category": remove_ext(file),
                 "path_points": path_points,
-                "id": f"{i}_{file}" 
+                "id": i
             }
             task_list.append(data_dict)
 
@@ -131,8 +149,8 @@ if __name__ == "__main__":
                         help="Subdirectory of texture_sets to get textures from")
     parser.add_argument("--dataset", type=str,
                         help="Subdirectory of datasets to store results in")
-    parser.add_argument("--save_all", action="store_true",
-                        help="Save all stimulus and texture information")
+    parser.add_argument("--save_attrs", nargs="+", choices=DATA_ATTR_CHOICES, default=CUSTOM_ATTRS,
+                        help="Attributes to save")
     parser.add_argument("--num_processes", type=int, default=max(1, os.cpu_count()//4),
                         help="The number of processes to run")
     parser.add_argument("--stimulus_duration", type=float, default=1,
@@ -155,8 +173,6 @@ if __name__ == "__main__":
                         help="Rotation of finger [rad]")
     parser.add_argument("--affpop_density_multiplier", type=float, default=1,
                         help="Factor to proportionally scale afferent density")
-    parser.add_argument("--bin_size", type=int, default=5,
-                        help="The bin size for discretizing time [ms]")
 
     args = parser.parse_args()
 

@@ -1,12 +1,17 @@
 import lzma
 import pickle
 import json
+import re
 
 
 def add_ext(path, ext):
     if path[-len(ext):] != ext:
         return path + ext
     return path
+
+
+def remove_ext(path):
+    return re.sub(r"\..*", "", path)
 
 
 def save_pkl(obj, path):
@@ -25,7 +30,7 @@ def load_pkl(path):
 def save_json(obj, path):
     path = add_ext(path, ".json")
     with open(path, "w") as f:
-        json.dump(obj, f)
+        json.dump(obj, f, indent=2)
 
 
 def load_json(path):

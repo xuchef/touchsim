@@ -4,6 +4,10 @@ TEXTURE_SETS_DIR = join("experiments", "texture_sets")
 DATASETS_DIR = join("experiments", "datasets")
 MODELS_DIR = join("experiments", "models")
 AFF_CHOICES = ["SA1", "RA", "PC", "all"]
+SIMPLE_ATTRS = ["response", "texture", "stimulus", "pins"] 
+CUSTOM_ATTRS = ["spikes", "psth"]
+DATA_ATTR_CHOICES = CUSTOM_ATTRS + SIMPLE_ATTRS 
+MODEL_ATTR_CHOICES = ["train", "test"] 
 
 PERCENT_TRAINING = 70
 PERCENT_VALIDATION = 15
