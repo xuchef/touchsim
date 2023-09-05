@@ -45,7 +45,7 @@ def run_quick_mode(args, path_util, dataset_info):
         valid_indices = set()
         max_val = 0
 
-        print("Pass #1 of 2")
+        print("Pass #1 of 2", flush=True)
         for category in dataset_info["categories"]:
             for i in range(dataset_info["samples_per_texture"]):
                 spikes = get_attr_from_folder("spikes", path_util, aff_class, category, i)
@@ -56,9 +56,9 @@ def run_quick_mode(args, path_util, dataset_info):
                 max_val = max(max_val, np.max(psth))
 
         valid_indices = np.array(list(valid_indices))
-        print(f"{len(valid_indices)} indices with a max of {max_val}")
+        print(f"{len(valid_indices)} indices with a max of {max_val}", flush=True)
 
-        print("Pass #2 of 2")
+        print("Pass #2 of 2", flush=True)
         for category in dataset_info["categories"]:
             for i in np.random.permutation(dataset_info["samples_per_texture"]):
                 psth = get_attr_from_folder("psth", path_util, aff_class, category, i)
