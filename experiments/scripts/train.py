@@ -74,7 +74,7 @@ def train_model(args, path_util, aff_class):
     model.fit(train_dataset, epochs=args.epochs, validation_data=val_dataset,
               callbacks=[
                   callback_model_checkpoint(path_util.aff_weight_paths[aff_class]),
-                  callback_tensorboard(path_util.aff_logs_paths[aff_class])
+                  callback_tensorboard(path_util.aff_logs_dirs[aff_class])
               ])
 
     validate_model(path_util, aff_class)
